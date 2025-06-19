@@ -420,9 +420,6 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
         };
       }
 
-      // Gera uma chave de idempotência única
-      const idempotencyKey = crypto.randomBytes(16).toString('hex');
-
       // Monta o corpo igual ao CURL
       const paymentData = {
         transaction_amount: Number(preco),
@@ -448,7 +445,7 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
       const headers = {
         'Authorization': `Bearer ${process.env.MERCADO_PAGO_ACCESS_TOKEN}`,
         'Content-Type': 'application/json',
-        'X-Idempotency-Key': idempotencyKey,
+        'X-Idempotency-Key': 'teste-pix-001', // igual ao curl para teste
         'User-Agent': 'curl/7.55.1'
       };
       console.log('[PIX] Headers enviados:', headers);
