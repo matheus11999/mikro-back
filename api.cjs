@@ -172,8 +172,8 @@ app.get('/api/captive-check', (req, res) => {
 // 1. Status do MAC
 app.post('/api/captive-check/status', async (req, res, next) => {
   try {
-    const { mac, mikrotik_id } = req.body;
-    console.log('[STATUS] Recebido:', { mac, mikrotik_id });
+    const { mac, mikrotik_id, plano_id } = req.body;
+    console.log('[STATUS] Recebido:', { mac, mikrotik_id, plano_id });
 
     if (!mac || !isValidMac(mac)) {
       throw {
@@ -183,7 +183,6 @@ app.post('/api/captive-check/status', async (req, res, next) => {
         source: 'API'
       };
     }
-
     if (!mikrotik_id) {
       throw {
         message: 'mikrotik_id obrigatório',
@@ -192,17 +191,14 @@ app.post('/api/captive-check/status', async (req, res, next) => {
         source: 'API'
       };
     }
-
     // Busca MAC existente
-    const macs = await handleSupabaseOperation(() => 
+    const macs = await handleSupabaseOperation(() =>
       supabaseAdmin
         .from('macs')
         .select('*')
         .eq('mac_address', mac)
     );
-
     let macObj = macs && macs[0];
-
     if (!macObj) {
       const novoMac = await handleSupabaseOperation(() =>
         supabaseAdmin
@@ -225,7 +221,6 @@ app.post('/api/captive-check/status', async (req, res, next) => {
           .select()
           .single()
       );
-
       macObj = novoMac;
       return res.json({
         status: 'novo_mac',
@@ -233,7 +228,6 @@ app.post('/api/captive-check/status', async (req, res, next) => {
         mac: normalizaMac(macObj)
       });
     }
-
     // Atualiza mikrotik_id se necessário
     if (mikrotik_id && macObj.mikrotik_id !== mikrotik_id) {
       const updatedMac = await handleSupabaseOperation(() =>
@@ -244,57 +238,111 @@ app.post('/api/captive-check/status', async (req, res, next) => {
           .select()
           .single()
       );
-
       macObj = updatedMac;
     }
-
     // Busca vendas aprovadas
-    const vendas = await handleSupabaseOperation(() =>
+    const vendasAprovadas = await handleSupabaseOperation(() =>
       supabaseAdmin
         .from('vendas')
-        .select(`
-          *,
-          senha_id (*),
-          plano_id (*),
-          mikrotik_id (*)
-        `)
+        .select(`*, senha_id (*), plano_id (*), mikrotik_id (*)`)
         .eq('mac_id', macObj.id)
         .eq('status', 'aprovado')
         .order('data', { ascending: false })
     );
-
+    // Busca venda pendente (aguardando/pendente) mais recente
+    const vendaPendenteArr = await handleSupabaseOperation(() =>
+      supabaseAdmin
+        .from('vendas')
+        .select('*')
+        .eq('mac_id', macObj.id)
+        .eq('mikrotik_id', mikrotik_id)
+        .in('status', ['aguardando', 'pendente'])
+        .order('pagamento_gerado_em', { ascending: false })
+        .limit(1)
+    );
+    const vendaPendente = vendaPendenteArr && vendaPendenteArr[0];
+    // Estatísticas do MAC
+    const totalVendas = vendasAprovadas ? vendasAprovadas.length : 0;
+    const totalGasto = vendasAprovadas ? vendasAprovadas.reduce((acc, v) => acc + Number(v.preco || 0), 0) : 0;
+    const ultimoValor = vendasAprovadas && vendasAprovadas[0] ? vendasAprovadas[0].preco : null;
+    const ultimoPlano = vendasAprovadas && vendasAprovadas[0] ? vendasAprovadas[0].plano_id : null;
+    // Se houver venda pendente, retorna status pendente e detalhes do pagamento
+    if (vendaPendente) {
+      // Consulta status Mercado Pago
+      let statusPagamento = vendaPendente.status;
+      try {
+        if (vendaPendente.payment_id) {
+          const paymentResult = await fetch(`https://api.mercadopago.com/v1/payments/${vendaPendente.payment_id}`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${process.env.MERCADO_PAGO_ACCESS_TOKEN}`,
+              'Content-Type': 'application/json'
+            }
+          }).then(r => r.json());
+          statusPagamento = paymentResult.status || statusPagamento;
+        }
+      } catch (err) {
+        // Se erro, mantém status anterior
+      }
+      return res.json({
+        status: 'pendente',
+        mac: macObj.mac_address,
+        mikrotik_id: macObj.mikrotik_id,
+        total_vendas: totalVendas,
+        total_gasto: totalGasto,
+        ultimo_valor: ultimoValor,
+        ultimo_plano: ultimoPlano,
+        pagamento_pendente: {
+          status: statusPagamento,
+          pagamento_gerado_em: vendaPendente.pagamento_gerado_em,
+          chave_pix: vendaPendente.chave_pix,
+          qrcode: vendaPendente.qrcode,
+          valor: vendaPendente.preco,
+          ticket_url: vendaPendente.payment_id,
+          payment_id: vendaPendente.payment_id
+        }
+      });
+    }
+    // Se houver venda aprovada válida (senha ativa)
     const agora = new Date();
     let senhaValida = null;
-
-    if (vendas && vendas.length > 0) {
-      for (const venda of vendas) {
+    if (vendasAprovadas && vendasAprovadas.length > 0) {
+      for (const venda of vendasAprovadas) {
         const inicio = new Date(venda.data);
         const duracao = venda.plano_id?.duracao || 60;
         const fim = new Date(inicio.getTime() + duracao * 60000);
-
         if (agora < fim) {
           senhaValida = venda;
           break;
         }
       }
     }
-
     if (senhaValida) {
       return res.json({
         status: 'autenticado',
+        mac: macObj.mac_address,
+        mikrotik_id: macObj.mikrotik_id,
+        total_vendas: totalVendas,
+        total_gasto: totalGasto,
+        ultimo_valor: ultimoValor,
+        ultimo_plano: ultimoPlano,
         username: senhaValida.senha_id?.usuario,
         password: senhaValida.senha_id?.senha,
         plano: senhaValida.plano_id?.nome,
         duracao: senhaValida.plano_id?.duracao,
-        fim: senhaValida.data ? 
-          new Date(new Date(senhaValida.data).getTime() + 
-          (senhaValida.plano_id?.duracao || 60) * 60000).toISOString() : 
-          null
+        fim: senhaValida.data ? new Date(new Date(senhaValida.data).getTime() + (senhaValida.plano_id?.duracao || 60) * 60000).toISOString() : null
       });
     }
-
-    return res.json({ status: 'precisa_comprar' });
-
+    // Se não houver venda, retorna precisa_comprar e estatísticas
+    return res.json({
+      status: 'precisa_comprar',
+      mac: macObj.mac_address,
+      mikrotik_id: macObj.mikrotik_id,
+      total_vendas: totalVendas,
+      total_gasto: totalGasto,
+      ultimo_valor: ultimoValor,
+      ultimo_plano: ultimoPlano
+    });
   } catch (err) {
     next(err);
   }
