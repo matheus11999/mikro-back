@@ -470,14 +470,46 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
         mpData = await payment.create(paymentData);
       } catch (err) {
         console.error('Erro Mercado Pago (SDK):', err);
-        return res.status(err.status || 500).json({
-          error: 'Erro ao processar pagamento no Mercado Pago (SDK)',
-          code: err.code || 'MERCADOPAGO_ERROR',
-          details: err.message || err,
-          status: err.status || 500,
-          body: err,
-          payload_enviado: paymentData
-        });
+        // Fallback: chamada manual via fetch igual ao curl
+        try {
+          const idempotencyKey = `test-pix-${Date.now()}`;
+          const fetchPayload = {
+            transaction_amount: paymentData.transaction_amount,
+            description: paymentData.description,
+            payment_method_id: paymentData.payment_method_id,
+            payer: paymentData.payer
+          };
+          console.log('FALLBACK FETCH: payload', fetchPayload);
+          const fetchRes = await fetch('https://api.mercadopago.com/v1/payments', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${process.env.MERCADO_PAGO_ACCESS_TOKEN}`,
+              'Content-Type': 'application/json',
+              'X-Idempotency-Key': idempotencyKey
+            },
+            body: JSON.stringify(fetchPayload)
+          });
+          const fetchData = await fetchRes.json();
+          console.log('FALLBACK FETCH: resposta', fetchData);
+          if (!fetchRes.ok) {
+            return res.status(fetchRes.status).json({
+              error: 'Erro ao processar pagamento no Mercado Pago (fetch)',
+              code: 'MERCADOPAGO_ERROR_FETCH',
+              details: fetchData,
+              status: fetchRes.status,
+              payload_enviado: fetchPayload
+            });
+          }
+          mpData = fetchData;
+        } catch (fetchErr) {
+          console.error('Erro Mercado Pago (fetch):', fetchErr);
+          return res.status(500).json({
+            error: 'Erro ao processar pagamento no Mercado Pago (fetch)',
+            code: 'MERCADOPAGO_ERROR_FETCH',
+            details: fetchErr,
+            status: 500
+          });
+        }
       }
 
       // Salva venda
