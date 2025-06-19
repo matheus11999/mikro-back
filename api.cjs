@@ -343,226 +343,197 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
       };
     }
 
-    // Busca ou cria MAC
-    let macObj;
-    try {
-      // Busca MAC existente
-      const macs = await handleSupabaseOperation(() =>
-        supabaseAdmin
-          .from('macs')
-          .select('id, mikrotik_id')
-          .eq('mac_address', mac)
-      );
+    // Busca MAC
+    const macObj = await handleSupabaseOperation(() =>
+      supabaseAdmin
+        .from('macs')
+        .select('id')
+        .eq('mac_address', mac)
+        .single()
+    );
+    if (!macObj) {
+      return res.status(400).json({ error: 'MAC não encontrado', code: 'MAC_NOT_FOUND' });
+    }
+    // Verifica se já existe venda pendente para este MAC/plano/mikrotik
+    const vendaPendente = await handleSupabaseOperation(() =>
+      supabaseAdmin
+        .from('vendas')
+        .select('*')
+        .eq('mac_id', macObj.id)
+        .eq('plano_id', plano_id)
+        .eq('mikrotik_id', mikrotik_id)
+        .in('status', ['aguardando', 'pendente'])
+        .order('pagamento_gerado_em', { ascending: false })
+        .limit(1)
+    );
+    if (vendaPendente && vendaPendente.length > 0) {
+      return res.status(400).json({
+        error: 'Já existe um pagamento pendente para este MAC/plano/mikrotik.',
+        code: 'PENDING_PAYMENT_EXISTS'
+      });
+    }
+    // Busca senha disponível apenas pelo plano
+    const senhaDisponivel = await handleSupabaseOperation(() =>
+      supabaseAdmin
+        .from('senhas')
+        .select('id')
+        .eq('plano_id', plano_id)
+        .eq('vendida', false)
+        .limit(1)
+        .maybeSingle()
+    );
+    if (!senhaDisponivel) {
+      return res.status(400).json({
+        error: 'Não há senhas disponíveis para este plano. Contate o administrador.',
+        code: 'NO_PASSWORD_AVAILABLE'
+      });
+    }
 
-      macObj = macs && macs[0];
+    // Verifica plano
+    const plano = await handleSupabaseOperation(() =>
+      supabaseAdmin
+        .from('planos')
+        .select('id, nome')
+        .eq('id', plano_id)
+        .single()
+    );
 
-      // Se não existe, cria novo MAC
-      if (!macObj) {
-        const novoMac = await handleSupabaseOperation(() =>
-          supabaseAdmin
-            .from('macs')
-            .insert([{
-              mac_address: mac,
-              mikrotik_id,
-              status: 'coletado',
-              primeiro_acesso: new Date().toISOString(),
-              ultimo_acesso: null,
-              total_compras: 0,
-              ultimo_plano: '',
-              ultimo_valor: 0,
-              total_gasto: 0,
-              status_pagamento: 'aguardando',
-              chave_pix: '',
-              qrcode: '',
-              pagamento_aprovado_em: null
-            }])
-            .select()
-            .single()
-        );
-
-        macObj = novoMac;
-      }
-
-      // Atualiza mikrotik_id se necessário
-      if (mikrotik_id && macObj.mikrotik_id !== mikrotik_id) {
-        const updatedMac = await handleSupabaseOperation(() =>
-          supabaseAdmin
-            .from('macs')
-            .update({ mikrotik_id })
-            .eq('id', macObj.id)
-            .select()
-            .single()
-        );
-
-        macObj = updatedMac;
-      }
-
-      // Verifica plano
-      const plano = await handleSupabaseOperation(() =>
-        supabaseAdmin
-          .from('planos')
-          .select('id, nome')
-          .eq('id', plano_id)
-          .single()
-      );
-
-      if (!plano) {
-        throw {
-          message: 'Plano não encontrado',
-          code: 'NOT_FOUND',
-          details: `Plano com ID ${plano_id} não existe`,
-          source: 'API'
-        };
-      }
-
-      // Verifica mikrotik
-      const mikrotik = await handleSupabaseOperation(() =>
-        supabaseAdmin
-          .from('mikrotiks')
-          .select('*')
-          .eq('id', mikrotik_id)
-          .single()
-      );
-
-      if (!mikrotik) {
-        throw {
-          message: 'Mikrotik não encontrado',
-          code: 'NOT_FOUND',
-          details: `Mikrotik com ID ${mikrotik_id} não existe`,
-          source: 'API'
-        };
-      }
-
-      // Antes de gerar Pix, verificar se há senha disponível para o mikrotik/plano
-      const senhaDisponivel = await handleSupabaseOperation(() =>
-        supabaseAdmin
-          .from('senhas')
-          .select('id')
-          .eq('mikrotik_id', mikrotik_id)
-          .eq('plano_id', plano_id)
-          .eq('vendida', false)
-          .limit(1)
-          .maybeSingle()
-      );
-      if (!senhaDisponivel) {
-        return res.status(400).json({
-          error: 'Não há senhas disponíveis para este Mikrotik/Plano. Contate o administrador.',
-          code: 'NO_PASSWORD_AVAILABLE'
-        });
-      }
-
-      // Monta o corpo igual ao CURL
-      const paymentData = {
-        transaction_amount: precoNumerico,
-        description: descricao || plano.nome,
-        payment_method_id: 'pix',
-        payer: payer || {
-          email: 'comprador@email.com',
-          first_name: 'Joao',
-          last_name: 'Silva',
-          identification: { type: 'CPF', number: '19119119100' },
-          address: {
-            zip_code: '06233200',
-            street_name: 'Av. das Nações Unidas',
-            street_number: '3003',
-            neighborhood: 'Bonfim',
-            city: 'Osasco',
-            federal_unit: 'SP'
-          }
-        }
+    if (!plano) {
+      throw {
+        message: 'Plano não encontrado',
+        code: 'NOT_FOUND',
+        details: `Plano com ID ${plano_id} não existe`,
+        source: 'API'
       };
+    }
 
-      // LOG DETALHADO PARA DEBUG
-      console.log('DEBUG paymentData:', paymentData, 'typeof transaction_amount:', typeof paymentData.transaction_amount);
-      if (paymentData.transaction_amount === null || typeof paymentData.transaction_amount !== 'number' || isNaN(paymentData.transaction_amount) || paymentData.transaction_amount <= 0) {
-        console.error('Erro: transaction_amount inválido antes de chamar Mercado Pago:', paymentData);
-        return res.status(400).json({
-          error: 'transaction_amount inválido antes de chamar Mercado Pago',
-          details: paymentData
-        });
+    // Verifica mikrotik
+    const mikrotik = await handleSupabaseOperation(() =>
+      supabaseAdmin
+        .from('mikrotiks')
+        .select('*')
+        .eq('id', mikrotik_id)
+        .single()
+    );
+
+    if (!mikrotik) {
+      throw {
+        message: 'Mikrotik não encontrado',
+        code: 'NOT_FOUND',
+        details: `Mikrotik com ID ${mikrotik_id} não existe`,
+        source: 'API'
+      };
+    }
+
+    // Monta o corpo igual ao CURL
+    const paymentData = {
+      transaction_amount: precoNumerico,
+      description: descricao || plano.nome,
+      payment_method_id: 'pix',
+      payer: payer || {
+        email: 'comprador@email.com',
+        first_name: 'Joao',
+        last_name: 'Silva',
+        identification: { type: 'CPF', number: '19119119100' },
+        address: {
+          zip_code: '06233200',
+          street_name: 'Av. das Nações Unidas',
+          street_number: '3003',
+          neighborhood: 'Bonfim',
+          city: 'Osasco',
+          federal_unit: 'SP'
+        }
       }
+    };
 
-      // Chamada usando SDK oficial do Mercado Pago
-      let mpData;
+    // LOG DETALHADO PARA DEBUG
+    console.log('DEBUG paymentData:', paymentData, 'typeof transaction_amount:', typeof paymentData.transaction_amount);
+    if (paymentData.transaction_amount === null || typeof paymentData.transaction_amount !== 'number' || isNaN(paymentData.transaction_amount) || paymentData.transaction_amount <= 0) {
+      console.error('Erro: transaction_amount inválido antes de chamar Mercado Pago:', paymentData);
+      return res.status(400).json({
+        error: 'transaction_amount inválido antes de chamar Mercado Pago',
+        details: paymentData
+      });
+    }
+
+    // Chamada usando SDK oficial do Mercado Pago
+    let mpData;
+    try {
+      mpData = await payment.create(paymentData);
+    } catch (err) {
+      console.error('Erro Mercado Pago (SDK):', err);
+      // Fallback: chamada manual via fetch igual ao curl
       try {
-        mpData = await payment.create(paymentData);
-      } catch (err) {
-        console.error('Erro Mercado Pago (SDK):', err);
-        // Fallback: chamada manual via fetch igual ao curl
-        try {
-          const idempotencyKey = `test-pix-${Date.now()}`;
-          const fetchPayload = {
-            transaction_amount: paymentData.transaction_amount,
-            description: paymentData.description,
-            payment_method_id: paymentData.payment_method_id,
-            payer: paymentData.payer
-          };
-          console.log('FALLBACK FETCH: payload', fetchPayload);
-          const fetchRes = await fetch('https://api.mercadopago.com/v1/payments', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${process.env.MERCADO_PAGO_ACCESS_TOKEN}`,
-              'Content-Type': 'application/json',
-              'X-Idempotency-Key': idempotencyKey
-            },
-            body: JSON.stringify(fetchPayload)
-          });
-          const fetchData = await fetchRes.json();
-          console.log('FALLBACK FETCH: resposta', fetchData);
-          if (!fetchRes.ok) {
-            return res.status(fetchRes.status).json({
-              error: 'Erro ao processar pagamento no Mercado Pago (fetch)',
-              code: 'MERCADOPAGO_ERROR_FETCH',
-              details: fetchData,
-              status: fetchRes.status,
-              payload_enviado: fetchPayload
-            });
-          }
-          mpData = fetchData;
-        } catch (fetchErr) {
-          console.error('Erro Mercado Pago (fetch):', fetchErr);
-          return res.status(500).json({
+        const idempotencyKey = `test-pix-${Date.now()}`;
+        const fetchPayload = {
+          transaction_amount: paymentData.transaction_amount,
+          description: paymentData.description,
+          payment_method_id: paymentData.payment_method_id,
+          payer: paymentData.payer
+        };
+        console.log('FALLBACK FETCH: payload', fetchPayload);
+        const fetchRes = await fetch('https://api.mercadopago.com/v1/payments', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.MERCADO_PAGO_ACCESS_TOKEN}`,
+            'Content-Type': 'application/json',
+            'X-Idempotency-Key': idempotencyKey
+          },
+          body: JSON.stringify(fetchPayload)
+        });
+        const fetchData = await fetchRes.json();
+        console.log('FALLBACK FETCH: resposta', fetchData);
+        if (!fetchRes.ok) {
+          return res.status(fetchRes.status).json({
             error: 'Erro ao processar pagamento no Mercado Pago (fetch)',
             code: 'MERCADOPAGO_ERROR_FETCH',
-            details: fetchErr,
-            status: 500
+            details: fetchData,
+            status: fetchRes.status,
+            payload_enviado: fetchPayload
           });
         }
+        mpData = fetchData;
+      } catch (fetchErr) {
+        console.error('Erro Mercado Pago (fetch):', fetchErr);
+        return res.status(500).json({
+          error: 'Erro ao processar pagamento no Mercado Pago (fetch)',
+          code: 'MERCADOPAGO_ERROR_FETCH',
+          details: fetchErr,
+          status: 500
+        });
       }
-
-      // Salva venda
-      await handleSupabaseOperation(() =>
-        supabaseAdmin
-          .from('vendas')
-          .insert([{
-            mac_id: macObj.id,
-            plano_id,
-            mikrotik_id,
-            preco: precoNumerico,
-            descricao: descricao || plano.nome,
-            status: 'aguardando',
-            payment_id: mpData.id,
-            chave_pix: mpData.point_of_interaction?.transaction_data?.qr_code,
-            qrcode: mpData.point_of_interaction?.transaction_data?.qr_code_base64,
-            ticket_url: mpData.point_of_interaction?.transaction_data?.ticket_url,
-            data: new Date().toISOString(),
-            pagamento_gerado_em: new Date().toISOString(),
-            pagamento_aprovado_em: null,
-            senha_id: null
-          }])
-      );
-
-      // Retorna igual ao CURL
-      return res.json({
-        ...mpData,
-        chave_pix: mpData.point_of_interaction?.transaction_data?.qr_code,
-        qrcode: mpData.point_of_interaction?.transaction_data?.qr_code_base64,
-        ticket_url: mpData.point_of_interaction?.transaction_data?.ticket_url
-      });
-
-    } catch (err) {
-      next(err);
     }
+
+    // Salva venda
+    await handleSupabaseOperation(() =>
+      supabaseAdmin
+        .from('vendas')
+        .insert([{
+          mac_id: macObj.id,
+          plano_id,
+          mikrotik_id,
+          preco: precoNumerico,
+          descricao: descricao || plano.nome,
+          status: 'aguardando',
+          payment_id: mpData.id,
+          chave_pix: mpData.point_of_interaction?.transaction_data?.qr_code,
+          qrcode: mpData.point_of_interaction?.transaction_data?.qr_code_base64,
+          ticket_url: mpData.point_of_interaction?.transaction_data?.ticket_url,
+          data: new Date().toISOString(),
+          pagamento_gerado_em: new Date().toISOString(),
+          pagamento_aprovado_em: null,
+          senha_id: null
+        }])
+    );
+
+    // Retorna igual ao CURL
+    return res.json({
+      ...mpData,
+      chave_pix: mpData.point_of_interaction?.transaction_data?.qr_code,
+      qrcode: mpData.point_of_interaction?.transaction_data?.qr_code_base64,
+      ticket_url: mpData.point_of_interaction?.transaction_data?.ticket_url
+    });
+
   } catch (err) {
     next(err);
   }
@@ -630,16 +601,22 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
     let senhaEntregue = null;
     if (venda.payment_id && venda.status !== 'aprovado') {
       try {
-        const paymentResult = await payment.get(venda.payment_id);
+        // Consulta status do pagamento via Mercado Pago (GET /v1/payments/:id)
+        const paymentResult = await fetch(`https://api.mercadopago.com/v1/payments/${venda.payment_id}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${process.env.MERCADO_PAGO_ACCESS_TOKEN}`,
+            'Content-Type': 'application/json'
+          }
+        }).then(r => r.json());
         statusPagamento = paymentResult.status;
         if (statusPagamento === 'approved' && venda.status !== 'aprovado') {
           pagamentoAprovadoEm = new Date().toISOString();
-          // Buscar senha aleatória disponível para o mikrotik/plano
+          // Buscar senha aleatória disponível para o plano
           const senha = await handleSupabaseOperation(() =>
             supabaseAdmin
               .from('senhas')
               .select('*')
-              .eq('mikrotik_id', mikrotik_id)
               .eq('plano_id', plano_id)
               .eq('vendida', false)
               .limit(1)
