@@ -1,7 +1,6 @@
 const express = require('express');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
-const { MercadoPagoConfig, Payment } = require('mercadopago');
 const crypto = require('crypto');
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 require('dotenv').config();
@@ -33,13 +32,7 @@ const supabaseAdmin = createClient(
   }
 );
 
-// Configuração do Mercado Pago com timeout
-const mp = new MercadoPagoConfig({ 
-  accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN,
-  options: { timeout: 5000 }
-});
-
-const payment = new Payment(mp);
+// Mercado Pago será acessado via fetch API diretamente
 
 // Configuração do Express
 const app = express();
@@ -104,36 +97,39 @@ async function handleSupabaseOperation(operation) {
   }
 }
 
-// Função utilitária para tratar erros do Mercado Pago
-async function handleMercadoPagoOperation(operation) {
+// Função utilitária para tratar respostas do Mercado Pago via fetch
+async function handleMercadoPagoFetch(url, options = {}) {
   try {
-    const result = await operation();
-    return result;
-  } catch (err) {
-    console.error('Erro Mercado Pago:', err);
-    
-    // Mapeamento de erros específicos do Mercado Pago
-    let errorMessage = 'Erro ao processar pagamento no Mercado Pago';
-    let errorCode = err.code || 'MERCADOPAGO_ERROR';
-    let errorDetails = err.message;
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Authorization': `Bearer ${process.env.MERCADO_PAGO_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json',
+        ...options.headers
+      }
+    });
 
-    if (err.status === 400) {
-      errorMessage = 'Requisição inválida ao Mercado Pago';
-      errorCode = 'MERCADOPAGO_INVALID_REQUEST';
-    } else if (err.status === 401) {
-      errorMessage = 'Credenciais inválidas do Mercado Pago';
-      errorCode = 'MERCADOPAGO_UNAUTHORIZED';
-    } else if (err.status === 404) {
-      errorMessage = 'Recurso não encontrado no Mercado Pago';
-      errorCode = 'MERCADOPAGO_NOT_FOUND';
+    const data = await response.json();
+    
+    if (!response.ok) {
+      console.error('Erro Mercado Pago (fetch):', data);
+      throw {
+        message: 'Erro ao processar requisição no Mercado Pago',
+        code: 'MERCADOPAGO_ERROR',
+        details: data,
+        status: response.status,
+        source: 'MercadoPago'
+      };
     }
 
+    return data;
+  } catch (err) {
+    if (err.code) throw err; // Já é um erro formatado
     throw {
-      message: errorMessage,
-      code: errorCode,
-      details: errorDetails,
-      source: 'MercadoPago',
-      originalError: process.env.NODE_ENV === 'development' ? err : undefined
+      message: 'Erro na comunicação com Mercado Pago',
+      code: 'MERCADOPAGO_NETWORK_ERROR',
+      details: err.message,
+      source: 'MercadoPago'
     };
   }
 }
@@ -288,13 +284,7 @@ app.post('/api/captive-check/status', async (req, res, next) => {
         if (vendaPendente.payment_id && vendaPendente.status !== 'aprovado') {
           console.log('[STATUS] Consultando pagamento no Mercado Pago:', vendaPendente.payment_id);
           
-          const paymentResult = await fetch(`https://api.mercadopago.com/v1/payments/${vendaPendente.payment_id}`, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${process.env.MERCADO_PAGO_ACCESS_TOKEN}`,
-              'Content-Type': 'application/json'
-            }
-          }).then(r => r.json());
+          const paymentResult = await handleMercadoPagoFetch(`https://api.mercadopago.com/v1/payments/${vendaPendente.payment_id}`);
           
           console.log('[STATUS] Resposta Mercado Pago:', {
             id: paymentResult.id,
@@ -627,7 +617,7 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
       };
     }
 
-    // Monta o corpo igual ao CURL
+    // Monta o corpo da requisição
     const paymentData = {
       transaction_amount: precoNumerico,
       description: descricao || plano.nome,
@@ -650,6 +640,7 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
 
     // LOG DETALHADO PARA DEBUG
     console.log('DEBUG paymentData:', paymentData, 'typeof transaction_amount:', typeof paymentData.transaction_amount);
+    
     if (paymentData.transaction_amount === null || typeof paymentData.transaction_amount !== 'number' || isNaN(paymentData.transaction_amount) || paymentData.transaction_amount <= 0) {
       console.error('Erro: transaction_amount inválido antes de chamar Mercado Pago:', paymentData);
       return res.status(400).json({
@@ -658,55 +649,22 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
       });
     }
 
-    // Chamada usando SDK oficial do Mercado Pago
-    let mpData;
-    try {
-      mpData = await payment.create(paymentData);
-    } catch (err) {
-      console.error('Erro Mercado Pago (SDK):', err);
-      // Fallback: chamada manual via fetch igual ao curl
-      try {
-        const idempotencyKey = `test-pix-${Date.now()}`;
-        const fetchPayload = {
-          transaction_amount: paymentData.transaction_amount,
-          description: paymentData.description,
-          payment_method_id: paymentData.payment_method_id,
-          payer: paymentData.payer
-        };
-        console.log('FALLBACK FETCH: payload', fetchPayload);
-        const fetchRes = await fetch('https://api.mercadopago.com/v1/payments', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${process.env.MERCADO_PAGO_ACCESS_TOKEN}`,
-            'Content-Type': 'application/json',
-            'X-Idempotency-Key': idempotencyKey
-          },
-          body: JSON.stringify(fetchPayload)
-        });
-        const fetchData = await fetchRes.json();
-        console.log('FALLBACK FETCH: resposta', fetchData);
-        if (!fetchRes.ok) {
-          return res.status(fetchRes.status).json({
-            error: 'Erro ao processar pagamento no Mercado Pago (fetch)',
-            code: 'MERCADOPAGO_ERROR_FETCH',
-            details: fetchData,
-            status: fetchRes.status,
-            payload_enviado: fetchPayload
-          });
-        }
-        mpData = fetchData;
-      } catch (fetchErr) {
-        console.error('Erro Mercado Pago (fetch):', fetchErr);
-        return res.status(500).json({
-          error: 'Erro ao processar pagamento no Mercado Pago (fetch)',
-          code: 'MERCADOPAGO_ERROR_FETCH',
-          details: fetchErr,
-          status: 500
-        });
-      }
-    }
+    // Cria pagamento PIX via Mercado Pago
+    console.log('GERANDO PIX: payload', paymentData);
+    
+    const idempotencyKey = `pix-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    const mpData = await handleMercadoPagoFetch('https://api.mercadopago.com/v1/payments', {
+      method: 'POST',
+      headers: {
+        'X-Idempotency-Key': idempotencyKey
+      },
+      body: JSON.stringify(paymentData)
+    });
 
-    // Salva venda: ticket_url = mpData.id (apenas o id do pagamento)
+    console.log('PIX GERADO: status OK, payment_id', mpData.id);
+
+    // Salva venda
     await handleSupabaseOperation(() =>
       supabaseAdmin
         .from('vendas')
@@ -720,7 +678,7 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
           payment_id: mpData.id,
           chave_pix: mpData.point_of_interaction?.transaction_data?.qr_code,
           qrcode: mpData.point_of_interaction?.transaction_data?.qr_code_base64,
-          ticket_url: mpData.id, // Salva apenas o id do pagamento
+          ticket_url: mpData.id,
           data: new Date().toISOString(),
           pagamento_gerado_em: new Date().toISOString(),
           pagamento_aprovado_em: null,
@@ -728,12 +686,12 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
         }])
     );
 
-    // Retorna igual ao CURL
+    // Retorna resposta
     return res.json({
       ...mpData,
       chave_pix: mpData.point_of_interaction?.transaction_data?.qr_code,
       qrcode: mpData.point_of_interaction?.transaction_data?.qr_code_base64,
-      ticket_url: mpData.id // Retorna apenas o id do pagamento
+      ticket_url: mpData.id
     });
 
   } catch (err) {
@@ -832,13 +790,7 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
         if (venda.payment_id && venda.status !== 'aprovado') {
           try {
             // Consulta status usando payment_id (que é o ticket_url)
-            const paymentResult = await fetch(`https://api.mercadopago.com/v1/payments/${venda.payment_id}`, {
-              method: 'GET',
-              headers: {
-                'Authorization': `Bearer ${process.env.MERCADO_PAGO_ACCESS_TOKEN}`,
-                'Content-Type': 'application/json'
-              }
-            }).then(r => r.json());
+            const paymentResult = await handleMercadoPagoFetch(`https://api.mercadopago.com/v1/payments/${venda.payment_id}`);
             statusPagamento = paymentResult.status;
             if (statusPagamento === 'approved' && venda.status !== 'aprovado') {
               pagamentoAprovadoEm = new Date().toISOString();
@@ -858,18 +810,21 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
                 await handleSupabaseOperation(() =>
                   supabaseAdmin
                     .from('senhas')
-                    .update({ vendida: true })
+                    .update({ 
+                      vendida: true,
+                      vendida_em: new Date().toISOString()
+                    })
                     .eq('id', senha.id)
                 );
                 // Buscar dono do mikrotik e porcentagem de lucro
                 const mikrotikInfo = await handleSupabaseOperation(() =>
                   supabaseAdmin
                     .from('mikrotiks')
-                    .select('cliente_id, porcentagem_lucro')
+                    .select('cliente_id, profitpercentage')
                     .eq('id', mikrotik_id)
                     .single()
                 );
-                let porcentagemLucro = mikrotikInfo?.porcentagem_lucro || 90;
+                let porcentagemLucro = mikrotikInfo?.profitpercentage || 90;
                 if (porcentagemLucro > 100) porcentagemLucro = 100;
                 if (porcentagemLucro < 0) porcentagemLucro = 0;
                 const comissaoDono = venda.preco * (porcentagemLucro / 100);
@@ -997,19 +952,7 @@ app.post('/api/captive-check/poll-payment', async (req, res, next) => {
 
     // Consulta o status no Mercado Pago
     try {
-      const paymentResult = await fetch(`https://api.mercadopago.com/v1/payments/${payment_id}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${process.env.MERCADO_PAGO_ACCESS_TOKEN}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!paymentResult.ok) {
-        throw new Error(`Mercado Pago API error: ${paymentResult.status}`);
-      }
-
-      const mpData = await paymentResult.json();
+      const mpData = await handleMercadoPagoFetch(`https://api.mercadopago.com/v1/payments/${payment_id}`);
       
       console.log('[POLL-PAYMENT] Status Mercado Pago:', {
         id: mpData.id,
