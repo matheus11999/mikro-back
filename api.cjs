@@ -322,20 +322,8 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
     }
 
     // Validação extra para preco
-    let precoNumerico = null;
-    try {
-      if (typeof preco === 'string') {
-        // Remove possíveis vírgulas e espaços
-        precoNumerico = parseFloat(preco.replace(',', '.').replace(/[^0-9.]/g, ''));
-      } else if (typeof preco === 'number') {
-        precoNumerico = preco;
-      } else {
-        precoNumerico = Number(preco);
-      }
-    } catch (e) {
-      precoNumerico = null;
-    }
-    console.log('DEBUG preco recebido:', preco, '-> precoNumerico:', precoNumerico, 'Tipo:', typeof preco);
+    let precoNumerico = 1; // Força o valor para 1 para teste
+    console.log('DEBUG preco recebido (forçado para teste):', preco, '-> precoNumerico:', precoNumerico, 'Tipo:', typeof precoNumerico);
     if (precoNumerico === null || isNaN(precoNumerico) || precoNumerico <= 0) {
       console.error('Erro: preco inválido recebido:', preco, 'Tipo:', typeof preco);
       throw {
@@ -447,7 +435,7 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
 
       // Monta o corpo igual ao CURL
       const paymentData = {
-        transaction_amount: precoNumerico,
+        transaction_amount: precoNumerico, // sempre 1 para teste
         description: descricao || plano.nome,
         payment_method_id: 'pix',
         payer: payer || {
@@ -500,7 +488,7 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
             mac_id: macObj.id,
             plano_id,
             mikrotik_id,
-            preco: precoNumerico,
+            preco: precoNumerico, // sempre 1 para teste
             descricao: descricao || plano.nome,
             status: 'aguardando',
             payment_id: mpData.id,
