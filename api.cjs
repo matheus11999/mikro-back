@@ -718,21 +718,24 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
                     .update({ vendida: true })
                     .eq('id', senha.id)
                 );
-                // Buscar dono do mikrotik
-                const donoMikrotik = await handleSupabaseOperation(() =>
+                // Buscar dono do mikrotik e porcentagem de lucro
+                const mikrotikInfo = await handleSupabaseOperation(() =>
                   supabaseAdmin
                     .from('mikrotiks')
-                    .select('cliente_id')
+                    .select('cliente_id, porcentagem_lucro')
                     .eq('id', mikrotik_id)
                     .single()
                 );
-                const comissaoAdmin = venda.preco * 0.1;
-                const comissaoDono = venda.preco * 0.9;
+                let porcentagemLucro = mikrotikInfo?.porcentagem_lucro || 90;
+                if (porcentagemLucro > 100) porcentagemLucro = 100;
+                if (porcentagemLucro < 0) porcentagemLucro = 0;
+                const comissaoDono = venda.preco * (porcentagemLucro / 100);
+                const comissaoAdmin = venda.preco - comissaoDono;
                 // Atualiza saldo do admin
                 await supabaseAdmin.rpc('incrementar_saldo_admin', { valor: comissaoAdmin });
                 // Atualiza saldo do dono do mikrotik
-                if (donoMikrotik && donoMikrotik.cliente_id) {
-                  await supabaseAdmin.rpc('incrementar_saldo_cliente', { cliente_id: donoMikrotik.cliente_id, valor: comissaoDono });
+                if (mikrotikInfo && mikrotikInfo.cliente_id) {
+                  await supabaseAdmin.rpc('incrementar_saldo_cliente', { cliente_id: mikrotikInfo.cliente_id, valor: comissaoDono });
                 }
                 // Atualiza venda
                 await handleSupabaseOperation(() =>
@@ -745,6 +748,17 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
                     })
                     .eq('id', venda.id)
                 );
+                // Atualiza MAC: incrementa total_gasto e total_compras
+                await handleSupabaseOperation(() =>
+                  supabaseAdmin
+                    .from('macs')
+                    .update({
+                      total_gasto: (macObj.total_gasto || 0) + Number(venda.preco || 0),
+                      total_compras: (macObj.total_compras || 0) + 1
+                    })
+                    .eq('id', macObj.id)
+                );
+                console.log('[VENDA APROVADA] Saldo creditado: admin', comissaoAdmin, 'dono', comissaoDono, 'MAC atualizado:', macObj.mac_address);
               }
             }
           } catch (err) {
