@@ -324,10 +324,18 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
     // Validação extra para preco
     let precoNumerico = null;
     try {
-      precoNumerico = typeof preco === 'number' ? preco : Number(preco);
+      if (typeof preco === 'string') {
+        // Remove possíveis vírgulas e espaços
+        precoNumerico = parseFloat(preco.replace(',', '.').replace(/[^0-9.]/g, ''));
+      } else if (typeof preco === 'number') {
+        precoNumerico = preco;
+      } else {
+        precoNumerico = Number(preco);
+      }
     } catch (e) {
       precoNumerico = null;
     }
+    console.log('DEBUG preco recebido:', preco, '-> precoNumerico:', precoNumerico, 'Tipo:', typeof preco);
     if (precoNumerico === null || isNaN(precoNumerico) || precoNumerico <= 0) {
       console.error('Erro: preco inválido recebido:', preco, 'Tipo:', typeof preco);
       throw {
@@ -492,7 +500,7 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
             mac_id: macObj.id,
             plano_id,
             mikrotik_id,
-            preco,
+            preco: precoNumerico,
             descricao: descricao || plano.nome,
             status: 'aguardando',
             payment_id: mpData.id,
