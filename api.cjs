@@ -321,6 +321,16 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
       };
     }
 
+    // Validação extra para preco
+    if (isNaN(Number(preco)) || Number(preco) <= 0) {
+      throw {
+        message: 'Preço inválido para o pagamento Pix',
+        code: 'VALIDATION_ERROR',
+        details: 'O valor do pagamento deve ser um número maior que zero',
+        source: 'API'
+      };
+    }
+
     if (!isValidMac(mac)) {
       throw {
         message: 'MAC inválido',
