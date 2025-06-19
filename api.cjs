@@ -181,13 +181,12 @@ app.post('/api/captive-check/planos', async (req, res, next) => {
 
     console.log('[PLANOS] Buscando planos para mikrotik:', mikrotik_id);
 
-    // Buscar planos ativos para o mikrotik
+    // Buscar planos para o mikrotik
     const planos = await handleSupabaseOperation(() =>
       supabaseAdmin
         .from('planos')
         .select('*')
         .eq('mikrotik_id', mikrotik_id)
-        .eq('ativo', true)
         .order('preco')
     );
 
