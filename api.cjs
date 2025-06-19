@@ -515,7 +515,7 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
       }
     }
 
-    // Salva venda
+    // Salva venda: ticket_url = mpData.id (apenas o id do pagamento)
     await handleSupabaseOperation(() =>
       supabaseAdmin
         .from('vendas')
@@ -529,7 +529,7 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
           payment_id: mpData.id,
           chave_pix: mpData.point_of_interaction?.transaction_data?.qr_code,
           qrcode: mpData.point_of_interaction?.transaction_data?.qr_code_base64,
-          ticket_url: mpData.point_of_interaction?.transaction_data?.ticket_url,
+          ticket_url: mpData.id, // Salva apenas o id do pagamento
           data: new Date().toISOString(),
           pagamento_gerado_em: new Date().toISOString(),
           pagamento_aprovado_em: null,
@@ -542,7 +542,7 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
       ...mpData,
       chave_pix: mpData.point_of_interaction?.transaction_data?.qr_code,
       qrcode: mpData.point_of_interaction?.transaction_data?.qr_code_base64,
-      ticket_url: mpData.point_of_interaction?.transaction_data?.ticket_url
+      ticket_url: mpData.id // Retorna apenas o id do pagamento
     });
 
   } catch (err) {
@@ -607,6 +607,8 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
     );
     const totalVendas = vendasMac ? vendasMac.length : 0;
     const totalGasto = vendasMac ? vendasMac.reduce((acc, v) => acc + Number(v.preco || 0), 0) : 0;
+    const ultimoValor = vendasMac && vendasMac[0] ? vendasMac[0].preco : null;
+    const ultimoPlano = vendasMac && vendasMac[0] ? vendasMac[0].plano_id : null;
     // Verifica se está dentro dos 10 minutos
     let statusPagamento = null;
     let pagamentoAprovadoEm = null;
@@ -638,6 +640,7 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
         pagamentoAprovadoEm = venda.pagamento_aprovado_em;
         if (venda.payment_id && venda.status !== 'aprovado') {
           try {
+            // Consulta status usando payment_id (que é o ticket_url)
             const paymentResult = await fetch(`https://api.mercadopago.com/v1/payments/${venda.payment_id}`, {
               method: 'GET',
               headers: {
@@ -707,7 +710,7 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
           chave_pix: venda.chave_pix,
           qrcode: venda.qrcode,
           valor: venda.preco,
-          ticket_url: venda.ticket_url,
+          ticket_url: venda.payment_id, // Retorna apenas o id do pagamento
           payment_id: venda.payment_id,
           senha: senhaEntregue
         };
@@ -719,10 +722,10 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
       mikrotik_id: macObj.mikrotik_id,
       total_vendas: totalVendas,
       total_gasto: totalGasto,
+      ultimo_valor: ultimoValor,
+      ultimo_plano: ultimoPlano,
       status_pagamento: statusPagamento,
-      ultimo_valor: vendasMac && vendasMac[0] ? vendasMac[0].preco : null,
-      ultimo_plano: vendasMac && vendasMac[0] ? vendasMac[0].plano_id : null,
-      ...infoVenda
+      pagamento_pendente: infoVenda,
     });
   } catch (err) {
     next(err);
