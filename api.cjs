@@ -270,8 +270,11 @@ app.post('/api/captive-check/status', async (req, res, next) => {
     if (vendaPendente) {
       // Consulta status Mercado Pago
       let statusPagamento = vendaPendente.status;
+      let pagamentoAprovadoEm = vendaPendente.pagamento_aprovado_em;
+      let senhaEntregue = null;
+      
       try {
-        if (vendaPendente.payment_id) {
+        if (vendaPendente.payment_id && vendaPendente.status !== 'aprovado') {
           const paymentResult = await fetch(`https://api.mercadopago.com/v1/payments/${vendaPendente.payment_id}`, {
             method: 'GET',
             headers: {
@@ -279,11 +282,128 @@ app.post('/api/captive-check/status', async (req, res, next) => {
               'Content-Type': 'application/json'
             }
           }).then(r => r.json());
+          
           statusPagamento = paymentResult.status || statusPagamento;
+          
+          // Se o pagamento foi aprovado no Mercado Pago mas ainda não foi processado no sistema
+          if (statusPagamento === 'approved' && vendaPendente.status !== 'aprovado') {
+            console.log('[STATUS] Pagamento aprovado detectado, processando...');
+            pagamentoAprovadoEm = new Date().toISOString();
+            
+            // Buscar senha aleatória disponível para o plano
+            const senha = await handleSupabaseOperation(() =>
+              supabaseAdmin
+                .from('senhas')
+                .select('*')
+                .eq('plano_id', vendaPendente.plano_id)
+                .eq('vendida', false)
+                .limit(1)
+                .single()
+            );
+            
+            if (senha) {
+              senhaEntregue = senha;
+              
+              // Marca senha como vendida
+              await handleSupabaseOperation(() =>
+                supabaseAdmin
+                  .from('senhas')
+                  .update({ vendida: true })
+                  .eq('id', senha.id)
+              );
+              
+              // Buscar dono do mikrotik e porcentagem de lucro
+              const mikrotikInfo = await handleSupabaseOperation(() =>
+                supabaseAdmin
+                  .from('mikrotiks')
+                  .select('cliente_id, porcentagem_lucro')
+                  .eq('id', mikrotik_id)
+                  .single()
+              );
+              
+              let porcentagemLucro = mikrotikInfo?.porcentagem_lucro || 90;
+              if (porcentagemLucro > 100) porcentagemLucro = 100;
+              if (porcentagemLucro < 0) porcentagemLucro = 0;
+              
+              const comissaoDono = vendaPendente.preco * (porcentagemLucro / 100);
+              const comissaoAdmin = vendaPendente.preco - comissaoDono;
+              
+              // Atualiza saldo do admin
+              await supabaseAdmin.rpc('incrementar_saldo_admin', { valor: comissaoAdmin });
+              
+              // Atualiza saldo do dono do mikrotik
+              if (mikrotikInfo && mikrotikInfo.cliente_id) {
+                await supabaseAdmin.rpc('incrementar_saldo_cliente', { 
+                  cliente_id: mikrotikInfo.cliente_id, 
+                  valor: comissaoDono 
+                });
+              }
+              
+              // Atualiza venda
+              await handleSupabaseOperation(() =>
+                supabaseAdmin
+                  .from('vendas')
+                  .update({
+                    status: 'aprovado',
+                    pagamento_aprovado_em: pagamentoAprovadoEm,
+                    senha_id: senha.id
+                  })
+                  .eq('id', vendaPendente.id)
+              );
+              
+              // Atualiza MAC: incrementa total_gasto e total_compras
+              await handleSupabaseOperation(() =>
+                supabaseAdmin
+                  .from('macs')
+                  .update({
+                    total_gasto: (macObj.total_gasto || 0) + Number(vendaPendente.preco || 0),
+                    total_compras: (macObj.total_compras || 0) + 1,
+                    ultimo_plano: vendaPendente.plano_id,
+                    ultimo_valor: vendaPendente.preco,
+                    ultimo_acesso: new Date().toISOString(),
+                    status_pagamento: 'aprovado',
+                    pagamento_aprovado_em: pagamentoAprovadoEm
+                  })
+                  .eq('id', macObj.id)
+              );
+              
+              console.log('[VENDA APROVADA] Saldo creditado: admin', comissaoAdmin, 'dono', comissaoDono);
+              
+              // Busca informações do plano para pegar a duração
+              const planoInfo = await handleSupabaseOperation(() =>
+                supabaseAdmin
+                  .from('planos')
+                  .select('nome, duracao')
+                  .eq('id', vendaPendente.plano_id)
+                  .single()
+              );
+              
+              const duracaoMinutos = planoInfo?.duracao || 60;
+              
+              // Retorna como autenticado com a senha
+              return res.json({
+                status: 'autenticado',
+                mac: macObj.mac_address,
+                mikrotik_id: macObj.mikrotik_id,
+                total_vendas: totalVendas + 1,
+                total_gasto: totalGasto + Number(vendaPendente.preco || 0),
+                ultimo_valor: vendaPendente.preco,
+                ultimo_plano: planoInfo?.nome || vendaPendente.plano_id,
+                username: senha.usuario,
+                password: senha.senha,
+                plano: planoInfo?.nome || vendaPendente.plano_id,
+                duracao: duracaoMinutos,
+                fim: new Date(new Date().getTime() + duracaoMinutos * 60000).toISOString()
+              });
+            }
+          }
         }
       } catch (err) {
+        console.error('[STATUS] Erro ao consultar Mercado Pago:', err);
         // Se erro, mantém status anterior
       }
+      
+      // Se ainda está pendente, retorna os dados do pagamento pendente
       return res.json({
         status: 'pendente',
         mac: macObj.mac_address,
@@ -786,8 +906,15 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
       total_gasto: totalGasto,
       ultimo_valor: ultimoValor,
       ultimo_plano: ultimoPlano,
-      status_pagamento: statusPagamento,
+      status: statusPagamento || 'precisa_comprar',
       pagamento_pendente: infoVenda,
+      ...(senhaEntregue && {
+        username: senhaEntregue.usuario,
+        password: senhaEntregue.senha,
+        plano: venda.plano_id,
+        duracao: 60,
+        fim: new Date(new Date().getTime() + 60 * 60000).toISOString()
+      })
     });
   } catch (err) {
     next(err);
