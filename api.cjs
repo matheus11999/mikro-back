@@ -322,11 +322,18 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
     }
 
     // Validação extra para preco
-    if (isNaN(Number(preco)) || Number(preco) <= 0) {
+    let precoNumerico = null;
+    try {
+      precoNumerico = typeof preco === 'number' ? preco : Number(preco);
+    } catch (e) {
+      precoNumerico = null;
+    }
+    if (precoNumerico === null || isNaN(precoNumerico) || precoNumerico <= 0) {
+      console.error('Erro: preco inválido recebido:', preco, 'Tipo:', typeof preco);
       throw {
         message: 'Preço inválido para o pagamento Pix',
         code: 'VALIDATION_ERROR',
-        details: 'O valor do pagamento deve ser um número maior que zero',
+        details: `O valor do pagamento deve ser um número maior que zero. Valor recebido: ${preco} (tipo: ${typeof preco})`,
         source: 'API'
       };
     }
@@ -432,7 +439,7 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
 
       // Monta o corpo igual ao CURL
       const paymentData = {
-        transaction_amount: Number(preco),
+        transaction_amount: precoNumerico,
         description: descricao || plano.nome,
         payment_method_id: 'pix',
         payer: payer || {
@@ -450,6 +457,16 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
           }
         }
       };
+
+      // LOG DETALHADO PARA DEBUG
+      console.log('DEBUG paymentData:', paymentData, 'typeof transaction_amount:', typeof paymentData.transaction_amount);
+      if (paymentData.transaction_amount === null || typeof paymentData.transaction_amount !== 'number' || isNaN(paymentData.transaction_amount) || paymentData.transaction_amount <= 0) {
+        console.error('Erro: transaction_amount inválido antes de chamar Mercado Pago:', paymentData);
+        return res.status(400).json({
+          error: 'transaction_amount inválido antes de chamar Mercado Pago',
+          details: paymentData
+        });
+      }
 
       // Chamada usando SDK oficial do Mercado Pago
       let mpData;
