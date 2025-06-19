@@ -322,8 +322,8 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
     }
 
     // Validação extra para preco
-    let precoNumerico = 1; // Força o valor para 1 para teste
-    console.log('DEBUG preco recebido (forçado para teste):', preco, '-> precoNumerico:', precoNumerico, 'Tipo:', typeof precoNumerico);
+    let precoNumerico = preco;
+    console.log('DEBUG preco recebido:', preco, '-> precoNumerico:', precoNumerico, 'Tipo:', typeof precoNumerico);
     if (precoNumerico === null || isNaN(precoNumerico) || precoNumerico <= 0) {
       console.error('Erro: preco inválido recebido:', preco, 'Tipo:', typeof preco);
       throw {
@@ -435,7 +435,7 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
 
       // Monta o corpo igual ao CURL
       const paymentData = {
-        transaction_amount: precoNumerico, // sempre 1 para teste
+        transaction_amount: precoNumerico,
         description: descricao || plano.nome,
         payment_method_id: 'pix',
         payer: payer || {
@@ -520,7 +520,7 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
             mac_id: macObj.id,
             plano_id,
             mikrotik_id,
-            preco: precoNumerico, // sempre 1 para teste
+            preco: precoNumerico,
             descricao: descricao || plano.nome,
             status: 'aguardando',
             payment_id: mpData.id,
@@ -623,19 +623,35 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
               .select('*')
               .eq('mikrotik_id', mikrotik_id)
               .eq('plano_id', plano_id)
-              .eq('usada', false)
+              .eq('vendida', false)
               .limit(1)
               .single()
           );
           if (senha) {
             senhaEntregue = senha;
-            // Marca senha como usada
+            // Marca senha como vendida
             await handleSupabaseOperation(() =>
               supabaseAdmin
                 .from('senhas')
-                .update({ usada: true })
+                .update({ vendida: true })
                 .eq('id', senha.id)
             );
+            // Buscar dono do mikrotik
+            const donoMikrotik = await handleSupabaseOperation(() =>
+              supabaseAdmin
+                .from('mikrotiks')
+                .select('cliente_id')
+                .eq('id', mikrotik_id)
+                .single()
+            );
+            const comissaoAdmin = venda.preco * 0.1;
+            const comissaoDono = venda.preco * 0.9;
+            // Atualiza saldo do admin
+            await supabaseAdmin.rpc('incrementar_saldo_admin', { valor: comissaoAdmin });
+            // Atualiza saldo do dono do mikrotik
+            if (donoMikrotik && donoMikrotik.cliente_id) {
+              await supabaseAdmin.rpc('incrementar_saldo_cliente', { cliente_id: donoMikrotik.cliente_id, valor: comissaoDono });
+            }
             // Atualiza venda
             await handleSupabaseOperation(() =>
               supabaseAdmin
