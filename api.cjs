@@ -165,6 +165,68 @@ app.get('/api/captive-check', (req, res) => {
   res.json({ status: 'ok', message: 'API está funcionando!' });
 });
 
+// Endpoint para listar planos disponíveis
+app.post('/api/captive-check/planos', async (req, res, next) => {
+  try {
+    const { mikrotik_id } = req.body;
+    
+    if (!mikrotik_id) {
+      throw {
+        message: 'mikrotik_id obrigatório',
+        code: 'VALIDATION_ERROR',
+        details: 'O ID do Mikrotik é obrigatório',
+        source: 'API'
+      };
+    }
+
+    console.log('[PLANOS] Buscando planos para mikrotik:', mikrotik_id);
+
+    // Buscar planos ativos para o mikrotik
+    const planos = await handleSupabaseOperation(() =>
+      supabaseAdmin
+        .from('planos')
+        .select('*')
+        .eq('mikrotik_id', mikrotik_id)
+        .eq('ativo', true)
+        .order('preco')
+    );
+
+    if (!planos || planos.length === 0) {
+      return res.json({
+        planos: [],
+        message: 'Nenhum plano disponível para este mikrotik'
+      });
+    }
+
+    // Para cada plano, verificar se há senhas disponíveis
+    const planosComDisponibilidade = await Promise.all(
+      planos.map(async (plano) => {
+        const senhasDisponiveis = await handleSupabaseOperation(() =>
+          supabaseAdmin
+            .from('senhas')
+            .select('id')
+            .eq('plano_id', plano.id)
+            .eq('vendida', false)
+        );
+
+        return {
+          ...plano,
+          senhas_disponiveis: senhasDisponiveis ? senhasDisponiveis.length : 0,
+          disponivel: senhasDisponiveis && senhasDisponiveis.length > 0
+        };
+      })
+    );
+
+    return res.json({
+      planos: planosComDisponibilidade,
+      total: planosComDisponibilidade.length
+    });
+
+  } catch (err) {
+    next(err);
+  }
+});
+
 // 1. Status do MAC
 app.post('/api/captive-check/status', async (req, res, next) => {
   try {
