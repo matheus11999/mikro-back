@@ -441,38 +441,18 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
         }
       };
 
-      // Chamada HTTP igual ao CURL
-      const headers = {
-        'Authorization': `Bearer ${process.env.MERCADO_PAGO_ACCESS_TOKEN}`,
-        'Content-Type': 'application/json',
-        'X-Idempotency-Key': 'teste-pix-001', // igual ao curl para teste
-        'User-Agent': 'curl/7.55.1'
-      };
-      console.log('[PIX] Headers enviados:', headers);
-      console.log('[PIX] Payload enviado:', paymentData);
-      const mpRes = await fetch('https://api.mercadopago.com/v1/payments', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(paymentData)
-      });
-
-      const mpData = await mpRes.json();
-
-      if (!mpRes.ok) {
-        console.error('Erro Mercado Pago:', {
-          status: mpRes.status,
-          statusText: mpRes.statusText,
-          headers: Object.fromEntries(mpRes.headers.entries()),
-          body: mpData
-        });
-        return res.status(mpRes.status).json({
-          error: 'Erro ao processar pagamento no Mercado Pago',
-          code: mpData.code || 'MERCADOPAGO_ERROR',
-          details: mpData.message || mpData,
-          status: mpRes.status,
-          statusText: mpRes.statusText,
-          headers: Object.fromEntries(mpRes.headers.entries()),
-          body: mpData,
+      // Chamada usando SDK oficial do Mercado Pago
+      let mpData;
+      try {
+        mpData = await payment.create(paymentData);
+      } catch (err) {
+        console.error('Erro Mercado Pago (SDK):', err);
+        return res.status(err.status || 500).json({
+          error: 'Erro ao processar pagamento no Mercado Pago (SDK)',
+          code: err.code || 'MERCADOPAGO_ERROR',
+          details: err.message || err,
+          status: err.status || 500,
+          body: err,
           payload_enviado: paymentData
         });
       }
