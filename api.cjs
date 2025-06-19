@@ -265,7 +265,7 @@ app.post('/api/captive-check/status', async (req, res, next) => {
     const totalVendas = vendasAprovadas ? vendasAprovadas.length : 0;
     const totalGasto = vendasAprovadas ? vendasAprovadas.reduce((acc, v) => acc + Number(v.preco || 0), 0) : 0;
     const ultimoValor = vendasAprovadas && vendasAprovadas[0] ? vendasAprovadas[0].preco : null;
-    const ultimoPlano = vendasAprovadas && vendasAprovadas[0] ? vendasAprovadas[0].plano_id : null;
+    const ultimoPlano = vendasAprovadas && vendasAprovadas[0] ? vendasAprovadas[0].plano_id?.nome || '' : null;
     // Se houver venda pendente, retorna status pendente e detalhes do pagamento
     if (vendaPendente) {
       console.log('[STATUS] Venda pendente encontrada:', {
@@ -374,7 +374,7 @@ app.post('/api/captive-check/status', async (req, res, next) => {
                   .update({
                     total_gasto: (macObj.total_gasto || 0) + Number(vendaPendente.preco || 0),
                     total_compras: (macObj.total_compras || 0) + 1,
-                    ultimo_plano: vendaPendente.plano_id,
+                    ultimo_plano: planoInfo?.nome || vendaPendente.plano_id,
                     ultimo_valor: vendaPendente.preco,
                     ultimo_acesso: new Date().toISOString(),
                     status_pagamento: 'aprovado',
@@ -1086,7 +1086,7 @@ app.post('/api/captive-check/poll-payment', async (req, res, next) => {
             .update({
               total_gasto: (venda.mac_id.total_gasto || 0) + Number(venda.preco),
               total_compras: (venda.mac_id.total_compras || 0) + 1,
-              ultimo_plano: venda.plano_id.id,
+              ultimo_plano: venda.plano_id.nome,
               ultimo_valor: venda.preco,
               ultimo_acesso: new Date().toISOString(),
               status_pagamento: 'aprovado',
