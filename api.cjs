@@ -328,7 +328,10 @@ app.post('/api/captive-check/status', async (req, res, next) => {
               await handleSupabaseOperation(() =>
                 supabaseAdmin
                   .from('senhas')
-                  .update({ vendida: true })
+                  .update({ 
+                    vendida: true,
+                    vendida_em: new Date().toISOString()
+                  })
                   .eq('id', senha.id)
               );
               
@@ -336,12 +339,12 @@ app.post('/api/captive-check/status', async (req, res, next) => {
               const mikrotikInfo = await handleSupabaseOperation(() =>
                 supabaseAdmin
                   .from('mikrotiks')
-                  .select('cliente_id, porcentagem_lucro')
+                  .select('cliente_id, profitpercentage')
                   .eq('id', mikrotik_id)
                   .single()
               );
               
-              let porcentagemLucro = mikrotikInfo?.porcentagem_lucro || 90;
+              let porcentagemLucro = mikrotikInfo?.profitpercentage || 90;
               if (porcentagemLucro > 100) porcentagemLucro = 100;
               if (porcentagemLucro < 0) porcentagemLucro = 0;
               
@@ -1040,7 +1043,10 @@ app.post('/api/captive-check/poll-payment', async (req, res, next) => {
         await handleSupabaseOperation(() =>
           supabaseAdmin
             .from('senhas')
-            .update({ vendida: true })
+            .update({ 
+              vendida: true,
+              vendida_em: new Date().toISOString()
+            })
             .eq('id', senha.id)
         );
 
@@ -1048,13 +1054,13 @@ app.post('/api/captive-check/poll-payment', async (req, res, next) => {
         const mikrotikInfo = await handleSupabaseOperation(() =>
           supabaseAdmin
             .from('mikrotiks')
-            .select('cliente_id, porcentagem_lucro')
+            .select('cliente_id, profitpercentage')
             .eq('id', venda.mikrotik_id.id)
             .single()
         );
 
         // Calcula comissões
-        let porcentagemLucro = mikrotikInfo?.porcentagem_lucro || 90;
+        let porcentagemLucro = mikrotikInfo?.profitpercentage || 90;
         if (porcentagemLucro > 100) porcentagemLucro = 100;
         if (porcentagemLucro < 0) porcentagemLucro = 0;
         
