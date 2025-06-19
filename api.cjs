@@ -937,6 +937,199 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
   }
 });
 
+// 4. Endpoint de polling para pagamentos pendentes
+app.post('/api/captive-check/poll-payment', async (req, res, next) => {
+  try {
+    const { payment_id } = req.body;
+    
+    if (!payment_id) {
+      return res.status(400).json({
+        error: 'payment_id é obrigatório',
+        code: 'MISSING_PAYMENT_ID'
+      });
+    }
+
+    console.log('[POLL-PAYMENT] Verificando pagamento:', payment_id);
+
+    // Busca a venda pelo payment_id
+    const venda = await handleSupabaseOperation(() =>
+      supabaseAdmin
+        .from('vendas')
+        .select('*, mac_id(*), plano_id(*), mikrotik_id(*)')
+        .eq('payment_id', payment_id)
+        .single()
+    );
+
+    if (!venda) {
+      return res.status(404).json({
+        error: 'Pagamento não encontrado',
+        code: 'PAYMENT_NOT_FOUND'
+      });
+    }
+
+    // Se já está aprovado, retorna os dados
+    if (venda.status === 'aprovado' && venda.senha_id) {
+      const senha = await handleSupabaseOperation(() =>
+        supabaseAdmin
+          .from('senhas')
+          .select('*')
+          .eq('id', venda.senha_id)
+          .single()
+      );
+
+      return res.json({
+        status: 'approved',
+        payment_status: 'approved',
+        username: senha?.usuario,
+        password: senha?.senha,
+        plano: venda.plano_id?.nome,
+        duracao: venda.plano_id?.duracao || 60,
+        message: 'Pagamento já foi processado'
+      });
+    }
+
+    // Consulta o status no Mercado Pago
+    try {
+      const paymentResult = await fetch(`https://api.mercadopago.com/v1/payments/${payment_id}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${process.env.MERCADO_PAGO_ACCESS_TOKEN}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!paymentResult.ok) {
+        throw new Error(`Mercado Pago API error: ${paymentResult.status}`);
+      }
+
+      const mpData = await paymentResult.json();
+      
+      console.log('[POLL-PAYMENT] Status Mercado Pago:', {
+        id: mpData.id,
+        status: mpData.status,
+        status_detail: mpData.status_detail
+      });
+
+      // Se o pagamento foi aprovado no Mercado Pago
+      if (mpData.status === 'approved') {
+        console.log('[POLL-PAYMENT] Pagamento aprovado detectado, processando...');
+        
+        // Busca senha disponível
+        const senha = await handleSupabaseOperation(() =>
+          supabaseAdmin
+            .from('senhas')
+            .select('*')
+            .eq('plano_id', venda.plano_id.id)
+            .eq('vendida', false)
+            .limit(1)
+            .single()
+        );
+
+        if (!senha) {
+          return res.status(500).json({
+            error: 'Não há senhas disponíveis',
+            code: 'NO_PASSWORD_AVAILABLE'
+          });
+        }
+
+        // Marca senha como vendida
+        await handleSupabaseOperation(() =>
+          supabaseAdmin
+            .from('senhas')
+            .update({ vendida: true })
+            .eq('id', senha.id)
+        );
+
+        // Busca informações do mikrotik
+        const mikrotikInfo = await handleSupabaseOperation(() =>
+          supabaseAdmin
+            .from('mikrotiks')
+            .select('cliente_id, porcentagem_lucro')
+            .eq('id', venda.mikrotik_id.id)
+            .single()
+        );
+
+        // Calcula comissões
+        let porcentagemLucro = mikrotikInfo?.porcentagem_lucro || 90;
+        if (porcentagemLucro > 100) porcentagemLucro = 100;
+        if (porcentagemLucro < 0) porcentagemLucro = 0;
+        
+        const comissaoDono = venda.preco * (porcentagemLucro / 100);
+        const comissaoAdmin = venda.preco - comissaoDono;
+
+        // Atualiza saldos
+        await supabaseAdmin.rpc('incrementar_saldo_admin', { valor: comissaoAdmin });
+        
+        if (mikrotikInfo?.cliente_id) {
+          await supabaseAdmin.rpc('incrementar_saldo_cliente', { 
+            cliente_id: mikrotikInfo.cliente_id, 
+            valor: comissaoDono 
+          });
+        }
+
+        // Atualiza venda
+        await handleSupabaseOperation(() =>
+          supabaseAdmin
+            .from('vendas')
+            .update({
+              status: 'aprovado',
+              pagamento_aprovado_em: new Date().toISOString(),
+              senha_id: senha.id
+            })
+            .eq('id', venda.id)
+        );
+
+        // Atualiza MAC
+        await handleSupabaseOperation(() =>
+          supabaseAdmin
+            .from('macs')
+            .update({
+              total_gasto: (venda.mac_id.total_gasto || 0) + Number(venda.preco),
+              total_compras: (venda.mac_id.total_compras || 0) + 1,
+              ultimo_plano: venda.plano_id.id,
+              ultimo_valor: venda.preco,
+              ultimo_acesso: new Date().toISOString(),
+              status_pagamento: 'aprovado',
+              pagamento_aprovado_em: new Date().toISOString()
+            })
+            .eq('id', venda.mac_id.id)
+        );
+
+        console.log('[POLL-PAYMENT] Pagamento processado com sucesso');
+
+        return res.json({
+          status: 'approved',
+          payment_status: 'approved',
+          username: senha.usuario,
+          password: senha.senha,
+          plano: venda.plano_id.nome,
+          duracao: venda.plano_id.duracao || 60,
+          message: 'Pagamento aprovado e processado com sucesso'
+        });
+      }
+
+      // Retorna o status atual
+      return res.json({
+        status: 'pending',
+        payment_status: mpData.status,
+        status_detail: mpData.status_detail,
+        message: 'Pagamento ainda não foi aprovado'
+      });
+
+    } catch (mpError) {
+      console.error('[POLL-PAYMENT] Erro ao consultar Mercado Pago:', mpError);
+      return res.status(500).json({
+        error: 'Erro ao verificar status do pagamento',
+        code: 'MERCADOPAGO_ERROR',
+        details: mpError.message
+      });
+    }
+
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Registra o middleware de erro no final
 app.use(errorHandler);
 
