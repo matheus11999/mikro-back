@@ -200,19 +200,33 @@ app.post('/api/captive-check/planos', async (req, res, next) => {
     // Para cada plano, verificar se há senhas disponíveis
     const planosComDisponibilidade = await Promise.all(
       planos.map(async (plano) => {
-        const senhasDisponiveis = await handleSupabaseOperation(() =>
-          supabaseAdmin
-            .from('senhas')
-            .select('id')
-            .eq('plano_id', plano.id)
-            .eq('vendida', false)
-        );
+        try {
+          const senhasDisponiveis = await handleSupabaseOperation(() =>
+            supabaseAdmin
+              .from('senhas')
+              .select('id')
+              .eq('plano_id', plano.id)
+              .eq('vendida', false)
+          );
 
-        return {
-          ...plano,
-          senhas_disponiveis: senhasDisponiveis ? senhasDisponiveis.length : 0,
-          disponivel: senhasDisponiveis && senhasDisponiveis.length > 0
-        };
+          const count = senhasDisponiveis ? senhasDisponiveis.length : 0;
+          
+          console.log(`[PLANOS] Plano ${plano.nome}: ${count} senhas disponíveis`);
+
+          return {
+            ...plano,
+            senhas_disponiveis: count,
+            disponivel: count > 0
+          };
+        } catch (error) {
+          console.error(`[PLANOS] Erro ao verificar senhas para plano ${plano.id}:`, error);
+          // Em caso de erro, assume que está disponível
+          return {
+            ...plano,
+            senhas_disponiveis: 0,
+            disponivel: true // Assume disponível em caso de erro
+          };
+        }
       })
     );
 
