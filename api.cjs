@@ -223,9 +223,13 @@ app.post('/api/captive-check/status', async (req, res, next) => {
       );
       macObj = novoMac;
       return res.json({
-        status: 'novo_mac',
-        mensagem: `Novo Mac Adicionado ${mac}`,
-        mac: normalizaMac(macObj)
+        status: 'precisa_comprar',
+        mac: macObj.mac_address,
+        mikrotik_id: macObj.mikrotik_id,
+        total_vendas: 0,
+        total_gasto: 0,
+        ultimo_valor: null,
+        ultimo_plano: null
       });
     }
     // Atualiza mikrotik_id se necessário
