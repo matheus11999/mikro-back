@@ -549,56 +549,61 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
 // 3. Verificar status do pagamento
 app.post('/api/captive-check/verify', async (req, res, next) => {
   try {
-    const { payment_id } = req.body;
+    const { mac, mikrotik_id, plano_id } = req.body;
 
-    if (!payment_id) {
+    if (!mac || !mikrotik_id || !plano_id) {
       throw {
-        message: 'payment_id obrigatório',
+        message: 'mac, mikrotik_id e plano_id obrigatórios',
         code: 'VALIDATION_ERROR',
-        details: 'O ID do pagamento é obrigatório',
+        details: 'Informe mac, mikrotik_id e plano_id',
         source: 'API'
       };
     }
 
-    const paymentResult = await handleMercadoPagoOperation(async () => {
-      return await payment.get(payment_id);
-    });
-
-    const status = paymentResult.status;
-
-    // Buscar venda
+    // Busca venda mais recente para esse mac/plano/mikrotik
     const vendas = await handleSupabaseOperation(() =>
       supabaseAdmin
         .from('vendas')
         .select('*')
-        .eq('payment_id', payment_id)
+        .eq('mac_id',
+          supabaseAdmin
+            .from('macs')
+            .select('id')
+            .eq('mac_address', mac)
+            .single()
+            .then(macObj => macObj?.id || null)
+        )
+        .eq('plano_id', plano_id)
+        .eq('mikrotik_id', mikrotik_id)
+        .order('data', { ascending: false })
+        .limit(1)
     );
 
     const venda = vendas && vendas[0];
     if (!venda) {
-      throw {
-        message: 'Venda não encontrada',
-        code: 'NOT_FOUND',
-        details: `Venda com payment_id ${payment_id} não existe`,
-        source: 'API'
-      };
+      return res.json({ status: 'precisa_comprar' });
     }
 
-    // Atualiza status se aprovado
-    if (status === 'approved' && venda.status !== 'aprovado') {
-      await handleSupabaseOperation(() =>
-        supabaseAdmin
-          .from('vendas')
-          .update({
-            status: 'aprovado',
-            pagamento_aprovado_em: new Date().toISOString()
-          })
-          .eq('payment_id', payment_id)
-      );
+    // Verifica se está dentro dos 10 minutos
+    const agora = new Date();
+    const dataVenda = new Date(venda.data);
+    const diffMin = (agora - dataVenda) / 60000;
+    if (venda.status === 'aprovado') {
+      return res.json({ status: 'aprovado', ...venda });
+    } else if (diffMin <= 10) {
+      // Retorna dados do Pix pendente
+      return res.json({
+        status: 'pendente',
+        chave_pix: venda.chave_pix,
+        qrcode: venda.qrcode,
+        valor: venda.preco,
+        ticket_url: venda.ticket_url,
+        payment_id: venda.payment_id,
+        data: venda.data
+      });
+    } else {
+      return res.json({ status: 'precisa_comprar' });
     }
-
-    return res.json({ status });
-
   } catch (err) {
     next(err);
   }
