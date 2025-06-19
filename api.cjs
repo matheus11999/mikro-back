@@ -268,6 +268,13 @@ app.post('/api/captive-check/status', async (req, res, next) => {
     const ultimoPlano = vendasAprovadas && vendasAprovadas[0] ? vendasAprovadas[0].plano_id : null;
     // Se houver venda pendente, retorna status pendente e detalhes do pagamento
     if (vendaPendente) {
+      console.log('[STATUS] Venda pendente encontrada:', {
+        id: vendaPendente.id,
+        status: vendaPendente.status,
+        payment_id: vendaPendente.payment_id,
+        pagamento_aprovado_em: vendaPendente.pagamento_aprovado_em
+      });
+      
       // Consulta status Mercado Pago
       let statusPagamento = vendaPendente.status;
       let pagamentoAprovadoEm = vendaPendente.pagamento_aprovado_em;
@@ -275,6 +282,8 @@ app.post('/api/captive-check/status', async (req, res, next) => {
       
       try {
         if (vendaPendente.payment_id && vendaPendente.status !== 'aprovado') {
+          console.log('[STATUS] Consultando pagamento no Mercado Pago:', vendaPendente.payment_id);
+          
           const paymentResult = await fetch(`https://api.mercadopago.com/v1/payments/${vendaPendente.payment_id}`, {
             method: 'GET',
             headers: {
@@ -282,6 +291,13 @@ app.post('/api/captive-check/status', async (req, res, next) => {
               'Content-Type': 'application/json'
             }
           }).then(r => r.json());
+          
+          console.log('[STATUS] Resposta Mercado Pago:', {
+            id: paymentResult.id,
+            status: paymentResult.status,
+            status_detail: paymentResult.status_detail,
+            transaction_amount: paymentResult.transaction_amount
+          });
           
           statusPagamento = paymentResult.status || statusPagamento;
           
