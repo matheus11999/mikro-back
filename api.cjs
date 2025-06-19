@@ -526,7 +526,11 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
             payment_id: mpData.id,
             chave_pix: mpData.point_of_interaction?.transaction_data?.qr_code,
             qrcode: mpData.point_of_interaction?.transaction_data?.qr_code_base64,
-            data: new Date().toISOString()
+            ticket_url: mpData.point_of_interaction?.transaction_data?.ticket_url,
+            data: new Date().toISOString(),
+            pagamento_gerado_em: new Date().toISOString(),
+            pagamento_aprovado_em: null,
+            senha_id: null
           }])
       );
 
@@ -550,7 +554,6 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
 app.post('/api/captive-check/verify', async (req, res, next) => {
   try {
     const { mac, mikrotik_id, plano_id } = req.body;
-
     if (!mac || !mikrotik_id || !plano_id) {
       throw {
         message: 'mac, mikrotik_id e plano_id obrigatórios',
@@ -559,51 +562,112 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
         source: 'API'
       };
     }
-
-    // Busca venda mais recente para esse mac/plano/mikrotik
+    // Busca MAC
+    const macObj = await handleSupabaseOperation(() =>
+      supabaseAdmin
+        .from('macs')
+        .select('id')
+        .eq('mac_address', mac)
+        .single()
+    );
+    if (!macObj) return res.json({ status: 'precisa_comprar' });
+    // Busca venda mais recente pendente
     const vendas = await handleSupabaseOperation(() =>
       supabaseAdmin
         .from('vendas')
         .select('*')
-        .eq('mac_id',
-          supabaseAdmin
-            .from('macs')
-            .select('id')
-            .eq('mac_address', mac)
-            .single()
-            .then(macObj => macObj?.id || null)
-        )
+        .eq('mac_id', macObj.id)
         .eq('plano_id', plano_id)
         .eq('mikrotik_id', mikrotik_id)
-        .order('data', { ascending: false })
+        .in('status', ['aguardando', 'pendente'])
+        .order('pagamento_gerado_em', { ascending: false })
         .limit(1)
     );
-
     const venda = vendas && vendas[0];
-    if (!venda) {
-      return res.json({ status: 'precisa_comprar' });
-    }
-
+    if (!venda) return res.json({ status: 'precisa_comprar' });
     // Verifica se está dentro dos 10 minutos
     const agora = new Date();
-    const dataVenda = new Date(venda.data);
-    const diffMin = (agora - dataVenda) / 60000;
-    if (venda.status === 'aprovado') {
-      return res.json({ status: 'aprovado', ...venda });
-    } else if (diffMin <= 10) {
-      // Retorna dados do Pix pendente
-      return res.json({
-        status: 'pendente',
-        chave_pix: venda.chave_pix,
-        qrcode: venda.qrcode,
-        valor: venda.preco,
-        ticket_url: venda.ticket_url,
-        payment_id: venda.payment_id,
-        data: venda.data
-      });
-    } else {
+    const geradoEm = new Date(venda.pagamento_gerado_em);
+    const diffMin = (agora - geradoEm) / 60000;
+    if (diffMin > 10) {
+      // Zera campos de pagamento e permite novo Pix
+      await handleSupabaseOperation(() =>
+        supabaseAdmin
+          .from('vendas')
+          .update({
+            chave_pix: null,
+            qrcode: null,
+            ticket_url: null,
+            payment_id: null,
+            status: 'expirado',
+            pagamento_gerado_em: null
+          })
+          .eq('id', venda.id)
+      );
       return res.json({ status: 'precisa_comprar' });
     }
+    // Consulta status no Mercado Pago
+    let statusPagamento = venda.status;
+    let pagamentoAprovadoEm = venda.pagamento_aprovado_em;
+    let senhaEntregue = null;
+    if (venda.payment_id) {
+      try {
+        const paymentResult = await payment.get(venda.payment_id);
+        statusPagamento = paymentResult.status;
+        if (statusPagamento === 'approved' && venda.status !== 'aprovado') {
+          pagamentoAprovadoEm = new Date().toISOString();
+          // Buscar senha aleatória disponível para o mikrotik/plano
+          const senha = await handleSupabaseOperation(() =>
+            supabaseAdmin
+              .from('senhas')
+              .select('*')
+              .eq('mikrotik_id', mikrotik_id)
+              .eq('plano_id', plano_id)
+              .eq('usada', false)
+              .limit(1)
+              .single()
+          );
+          if (senha) {
+            senhaEntregue = senha;
+            // Marca senha como usada
+            await handleSupabaseOperation(() =>
+              supabaseAdmin
+                .from('senhas')
+                .update({ usada: true })
+                .eq('id', senha.id)
+            );
+            // Atualiza venda
+            await handleSupabaseOperation(() =>
+              supabaseAdmin
+                .from('vendas')
+                .update({
+                  status: 'aprovado',
+                  pagamento_aprovado_em: pagamentoAprovadoEm,
+                  senha_id: senha.id
+                })
+                .eq('id', venda.id)
+            );
+          }
+        }
+      } catch (err) {
+        // Se erro na consulta, mantém status anterior
+      }
+    }
+    // Retorna dados completos
+    return res.json({
+      status: statusPagamento,
+      mac,
+      plano_id,
+      mikrotik_id,
+      pagamento_gerado_em: venda.pagamento_gerado_em,
+      pagamento_aprovado_em: pagamentoAprovadoEm,
+      chave_pix: venda.chave_pix,
+      qrcode: venda.qrcode,
+      valor: venda.preco,
+      ticket_url: venda.ticket_url,
+      payment_id: venda.payment_id,
+      senha: senhaEntregue
+    });
   } catch (err) {
     next(err);
   }
