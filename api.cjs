@@ -433,6 +433,24 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
         };
       }
 
+      // Antes de gerar Pix, verificar se há senha disponível para o mikrotik/plano
+      const senhaDisponivel = await handleSupabaseOperation(() =>
+        supabaseAdmin
+          .from('senhas')
+          .select('id')
+          .eq('mikrotik_id', mikrotik_id)
+          .eq('plano_id', plano_id)
+          .eq('vendida', false)
+          .limit(1)
+          .maybeSingle()
+      );
+      if (!senhaDisponivel) {
+        return res.status(400).json({
+          error: 'Não há senhas disponíveis para este Mikrotik/Plano. Contate o administrador.',
+          code: 'NO_PASSWORD_AVAILABLE'
+        });
+      }
+
       // Monta o corpo igual ao CURL
       const paymentData = {
         transaction_amount: precoNumerico,
@@ -571,7 +589,7 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
         .single()
     );
     if (!macObj) return res.json({ status: 'precisa_comprar' });
-    // Busca venda mais recente pendente
+    // Busca venda mais recente pendente ou aprovada
     const vendas = await handleSupabaseOperation(() =>
       supabaseAdmin
         .from('vendas')
@@ -579,7 +597,7 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
         .eq('mac_id', macObj.id)
         .eq('plano_id', plano_id)
         .eq('mikrotik_id', mikrotik_id)
-        .in('status', ['aguardando', 'pendente'])
+        .in('status', ['aguardando', 'pendente', 'aprovado'])
         .order('pagamento_gerado_em', { ascending: false })
         .limit(1)
     );
@@ -589,7 +607,7 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
     const agora = new Date();
     const geradoEm = new Date(venda.pagamento_gerado_em);
     const diffMin = (agora - geradoEm) / 60000;
-    if (diffMin > 10) {
+    if (diffMin > 10 && venda.status !== 'aprovado') {
       // Zera campos de pagamento e permite novo Pix
       await handleSupabaseOperation(() =>
         supabaseAdmin
@@ -606,11 +624,11 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
       );
       return res.json({ status: 'precisa_comprar' });
     }
-    // Consulta status no Mercado Pago
+    // Consulta status no Mercado Pago se não aprovado
     let statusPagamento = venda.status;
     let pagamentoAprovadoEm = venda.pagamento_aprovado_em;
     let senhaEntregue = null;
-    if (venda.payment_id) {
+    if (venda.payment_id && venda.status !== 'aprovado') {
       try {
         const paymentResult = await payment.get(venda.payment_id);
         statusPagamento = paymentResult.status;
@@ -669,7 +687,7 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
         // Se erro na consulta, mantém status anterior
       }
     }
-    // Retorna dados completos
+    // Sempre retorna os dados do pagamento pendente ou aprovado
     return res.json({
       status: statusPagamento,
       mac,
