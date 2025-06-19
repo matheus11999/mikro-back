@@ -266,7 +266,7 @@ app.post('/api/captive-check/status', async (req, res, next) => {
     const totalGasto = vendasAprovadas ? vendasAprovadas.reduce((acc, v) => acc + Number(v.preco || 0), 0) : 0;
     const ultimoValor = vendasAprovadas && vendasAprovadas[0] ? vendasAprovadas[0].preco : null;
     const ultimoPlano = vendasAprovadas && vendasAprovadas[0] ? vendasAprovadas[0].plano_id?.nome || '' : null;
-    // Se houver venda pendente, retorna status pendente e detalhes do pagamento
+    // Se houver venda pendente, verifica status no Mercado Pago
     if (vendaPendente) {
       console.log('[STATUS] Venda pendente encontrada:', {
         id: vendaPendente.id,
@@ -278,7 +278,7 @@ app.post('/api/captive-check/status', async (req, res, next) => {
       // Consulta status Mercado Pago
       let statusPagamento = vendaPendente.status;
       let pagamentoAprovadoEm = vendaPendente.pagamento_aprovado_em;
-      let senhaEntregue = null;
+      let pagamentoFoiProcessado = false;
       
       try {
         if (vendaPendente.payment_id && vendaPendente.status !== 'aprovado') {
@@ -312,8 +312,6 @@ app.post('/api/captive-check/status', async (req, res, next) => {
             );
             
             if (senha) {
-              senhaEntregue = senha;
-              
               // Marca senha como vendida
               await handleSupabaseOperation(() =>
                 supabaseAdmin
@@ -364,6 +362,15 @@ app.post('/api/captive-check/status', async (req, res, next) => {
                   .eq('id', vendaPendente.id)
               );
               
+              // Busca informações do plano para pegar a duração
+              const planoInfo = await handleSupabaseOperation(() =>
+                supabaseAdmin
+                  .from('planos')
+                  .select('nome, duracao')
+                  .eq('id', vendaPendente.plano_id)
+                  .single()
+              );
+              
               // Atualiza MAC: incrementa total_gasto e total_compras
               await handleSupabaseOperation(() =>
                 supabaseAdmin
@@ -381,39 +388,50 @@ app.post('/api/captive-check/status', async (req, res, next) => {
               );
               
               console.log('[VENDA APROVADA] Saldo creditado: admin', comissaoAdmin, 'dono', comissaoDono);
+              console.log('[VENDA APROVADA] Senha entregue automaticamente:', senha.usuario);
               
-              // Busca informações do plano para pegar a duração
-              const planoInfo = await handleSupabaseOperation(() =>
-                supabaseAdmin
-                  .from('planos')
-                  .select('nome, duracao')
-                  .eq('id', vendaPendente.plano_id)
-                  .single()
-              );
-              
-              const duracaoMinutos = planoInfo?.duracao || 60;
-              
-              // Retorna como autenticado com a senha
-              return res.json({
-                status: 'autenticado',
-                mac: macObj.mac_address,
-                mikrotik_id: macObj.mikrotik_id,
-                total_vendas: totalVendas + 1,
-                total_gasto: totalGasto + Number(vendaPendente.preco || 0),
-                ultimo_valor: vendaPendente.preco,
-                ultimo_plano: planoInfo?.nome || vendaPendente.plano_id,
-                username: senha.usuario,
-                password: senha.senha,
-                plano: planoInfo?.nome || vendaPendente.plano_id,
-                duracao: duracaoMinutos,
-                fim: new Date(new Date().getTime() + duracaoMinutos * 60000).toISOString()
-              });
+              // Marca que o pagamento foi processado para recarregar os dados
+              pagamentoFoiProcessado = true;
             }
           }
         }
       } catch (err) {
         console.error('[STATUS] Erro ao consultar Mercado Pago:', err);
         // Se erro, mantém status anterior
+      }
+      
+      // Se o pagamento foi processado, recarrega os dados para mostrar como aprovado
+      if (pagamentoFoiProcessado) {
+        console.log('[STATUS] Pagamento processado, recarregando dados...');
+        // Recarrega vendas aprovadas
+        const vendasAprovadasAtualizadas = await handleSupabaseOperation(() =>
+          supabaseAdmin
+            .from('vendas')
+            .select(`*, senha_id (*), plano_id (*), mikrotik_id (*)`)
+            .eq('mac_id', macObj.id)
+            .eq('status', 'aprovado')
+            .order('data', { ascending: false })
+        );
+        
+        if (vendasAprovadasAtualizadas && vendasAprovadasAtualizadas.length > 0) {
+          const vendaAprovada = vendasAprovadasAtualizadas[0];
+          const duracaoMinutos = vendaAprovada.plano_id?.duracao || 60;
+          
+          return res.json({
+            status: 'autenticado',
+            mac: macObj.mac_address,
+            mikrotik_id: macObj.mikrotik_id,
+            total_vendas: vendasAprovadasAtualizadas.length,
+            total_gasto: vendasAprovadasAtualizadas.reduce((acc, v) => acc + Number(v.preco || 0), 0),
+            ultimo_valor: vendaAprovada.preco,
+            ultimo_plano: vendaAprovada.plano_id?.nome,
+            username: vendaAprovada.senha_id?.usuario,
+            password: vendaAprovada.senha_id?.senha,
+            plano: vendaAprovada.plano_id?.nome,
+            duracao: duracaoMinutos,
+            fim: new Date(new Date().getTime() + duracaoMinutos * 60000).toISOString()
+          });
+        }
       }
       
       // Se ainda está pendente, retorna os dados do pagamento pendente
