@@ -407,12 +407,12 @@ app.post('/api/captive-check/status', async (req, res, next) => {
                   .single()
               );
               
-              let porcentagemLucro = mikrotikInfo?.profitpercentage || 90;
-              if (porcentagemLucro > 100) porcentagemLucro = 100;
-              if (porcentagemLucro < 0) porcentagemLucro = 0;
+              let porcentagemAdmin = mikrotikInfo?.profitpercentage || 10;
+              if (porcentagemAdmin > 100) porcentagemAdmin = 100;
+              if (porcentagemAdmin < 0) porcentagemAdmin = 0;
               
-              const comissaoDono = vendaPendente.preco * (porcentagemLucro / 100);
-              const comissaoAdmin = vendaPendente.preco - comissaoDono;
+              const comissaoAdmin = vendaPendente.preco * (porcentagemAdmin / 100);
+              const comissaoDono = vendaPendente.preco - comissaoAdmin;
               
               // Atualiza saldo do admin
               await supabaseAdmin.rpc('incrementar_saldo_admin', { valor: comissaoAdmin });
@@ -432,7 +432,9 @@ app.post('/api/captive-check/status', async (req, res, next) => {
                   .update({
                     status: 'aprovado',
                     pagamento_aprovado_em: pagamentoAprovadoEm,
-                    senha_id: senha.id
+                    senha_id: senha.id,
+                    lucro: comissaoAdmin,
+                    valor: vendaPendente.preco
                   })
                   .eq('id', vendaPendente.id)
               );
@@ -917,11 +919,11 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
                     .eq('id', mikrotik_id)
                     .single()
                 );
-                let porcentagemLucro = mikrotikInfo?.profitpercentage || 90;
-                if (porcentagemLucro > 100) porcentagemLucro = 100;
-                if (porcentagemLucro < 0) porcentagemLucro = 0;
-                const comissaoDono = venda.preco * (porcentagemLucro / 100);
-                const comissaoAdmin = venda.preco - comissaoDono;
+                let porcentagemAdmin = mikrotikInfo?.profitpercentage || 10;
+                if (porcentagemAdmin > 100) porcentagemAdmin = 100;
+                if (porcentagemAdmin < 0) porcentagemAdmin = 0;
+                const comissaoAdmin = venda.preco * (porcentagemAdmin / 100);
+                const comissaoDono = venda.preco - comissaoAdmin;
                 // Atualiza saldo do admin
                 await supabaseAdmin.rpc('incrementar_saldo_admin', { valor: comissaoAdmin });
                 // Atualiza saldo do dono do mikrotik
@@ -935,7 +937,9 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
                     .update({
                       status: 'aprovado',
                       pagamento_aprovado_em: pagamentoAprovadoEm,
-                      senha_id: senha.id
+                      senha_id: senha.id,
+                      lucro: comissaoAdmin,
+                      valor: venda.preco
                     })
                     .eq('id', venda.id)
                 );
@@ -1096,12 +1100,12 @@ app.post('/api/captive-check/poll-payment', async (req, res, next) => {
         );
 
         // Calcula comissões
-        let porcentagemLucro = mikrotikInfo?.profitpercentage || 90;
-        if (porcentagemLucro > 100) porcentagemLucro = 100;
-        if (porcentagemLucro < 0) porcentagemLucro = 0;
+        let porcentagemAdmin = mikrotikInfo?.profitpercentage || 10;
+        if (porcentagemAdmin > 100) porcentagemAdmin = 100;
+        if (porcentagemAdmin < 0) porcentagemAdmin = 0;
         
-        const comissaoDono = venda.preco * (porcentagemLucro / 100);
-        const comissaoAdmin = venda.preco - comissaoDono;
+        const comissaoAdmin = venda.preco * (porcentagemAdmin / 100);
+        const comissaoDono = venda.preco - comissaoAdmin;
 
         // Atualiza saldos
         await supabaseAdmin.rpc('incrementar_saldo_admin', { valor: comissaoAdmin });
@@ -1120,7 +1124,9 @@ app.post('/api/captive-check/poll-payment', async (req, res, next) => {
             .update({
               status: 'aprovado',
               pagamento_aprovado_em: new Date().toISOString(),
-              senha_id: senha.id
+              senha_id: senha.id,
+              lucro: comissaoAdmin,
+              valor: venda.preco
             })
             .eq('id', venda.id)
         );
