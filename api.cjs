@@ -6,18 +6,23 @@ const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch
 require('dotenv').config();
 const path = require('path');
 
-// Validação de variáveis de ambiente
+// Validação de variáveis de ambiente (apenas aviso, não para execução)
 const requiredEnvVars = [
   'SUPABASE_URL',
   'SUPABASE_SERVICE_ROLE_KEY',
   'MERCADO_PAGO_ACCESS_TOKEN'
 ];
 
+const missingEnvVars = [];
 for (const envVar of requiredEnvVars) {
   if (!process.env[envVar]) {
-    console.error(`Erro: Variável de ambiente ${envVar} não definida`);
-    process.exit(1);
+    missingEnvVars.push(envVar);
   }
+}
+
+if (missingEnvVars.length > 0) {
+  console.warn(`Aviso: Variáveis de ambiente não definidas: ${missingEnvVars.join(', ')}`);
+  console.warn('A API pode não funcionar corretamente sem essas variáveis.');
 }
 
 // Inicialização dos clientes
@@ -164,6 +169,8 @@ const errorHandler = (err, req, res, next) => {
 app.get('/api/captive-check', (req, res) => {
   res.json({ status: 'ok', message: 'API está funcionando!' });
 });
+
+
 
 // Endpoint para listar planos disponíveis
 app.post('/api/captive-check/planos', async (req, res, next) => {
@@ -425,7 +432,7 @@ app.post('/api/captive-check/status', async (req, res, next) => {
                 });
               }
               
-              // Atualiza venda
+              // Atualiza venda - valor agora representa a parte do cliente
               await handleSupabaseOperation(() =>
                 supabaseAdmin
                   .from('vendas')
@@ -434,7 +441,7 @@ app.post('/api/captive-check/status', async (req, res, next) => {
                     pagamento_aprovado_em: pagamentoAprovadoEm,
                     senha_id: senha.id,
                     lucro: comissaoAdmin,
-                    valor: vendaPendente.preco
+                    valor: comissaoDono
                   })
                   .eq('id', vendaPendente.id)
               );
@@ -930,7 +937,7 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
                 if (mikrotikInfo && mikrotikInfo.cliente_id) {
                   await supabaseAdmin.rpc('incrementar_saldo_cliente', { cliente_id: mikrotikInfo.cliente_id, valor: comissaoDono });
                 }
-                // Atualiza venda
+                // Atualiza venda - valor agora representa a parte do cliente
                 await handleSupabaseOperation(() =>
                   supabaseAdmin
                     .from('vendas')
@@ -939,7 +946,7 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
                       pagamento_aprovado_em: pagamentoAprovadoEm,
                       senha_id: senha.id,
                       lucro: comissaoAdmin,
-                      valor: venda.preco
+                      valor: comissaoDono
                     })
                     .eq('id', venda.id)
                 );
@@ -1117,7 +1124,7 @@ app.post('/api/captive-check/poll-payment', async (req, res, next) => {
           });
         }
 
-        // Atualiza venda
+        // Atualiza venda - valor agora representa a parte do cliente
         await handleSupabaseOperation(() =>
           supabaseAdmin
             .from('vendas')
@@ -1126,7 +1133,7 @@ app.post('/api/captive-check/poll-payment', async (req, res, next) => {
               pagamento_aprovado_em: new Date().toISOString(),
               senha_id: senha.id,
               lucro: comissaoAdmin,
-              valor: venda.preco
+              valor: comissaoDono
             })
             .eq('id', venda.id)
         );
@@ -1176,6 +1183,89 @@ app.post('/api/captive-check/poll-payment', async (req, res, next) => {
         details: mpError.message
       });
     }
+
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Endpoint para listar MACs que compraram senhas no mesmo dia por Mikrotik
+app.get('/api/daily-sales/:mikrotik_id', async (req, res, next) => {
+  try {
+    const { mikrotik_id } = req.params;
+    
+    if (!mikrotik_id) {
+      throw {
+        message: 'mikrotik_id obrigatório',
+        code: 'VALIDATION_ERROR',
+        details: 'O ID do Mikrotik é obrigatório',
+        source: 'API'
+      };
+    }
+
+    console.log('[DAILY-SALES] Buscando vendas diárias para mikrotik:', mikrotik_id);
+
+    // Data de hoje (início e fim do dia em UTC)
+    const hoje = new Date();
+    const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+    const fimHoje = new Date(inicioHoje.getTime() + 24 * 60 * 60 * 1000);
+
+    // Buscar vendas aprovadas do dia atual para o mikrotik específico
+    const vendas = await handleSupabaseOperation(() =>
+      supabaseAdmin
+        .from('vendas')
+        .select(`
+          *,
+          mac_id (mac_address),
+          senha_id (usuario, senha),
+          plano_id (nome, duracao)
+        `)
+        .eq('mikrotik_id', mikrotik_id)
+        .eq('status', 'aprovado')
+        .gte('pagamento_aprovado_em', inicioHoje.toISOString())
+        .lt('pagamento_aprovado_em', fimHoje.toISOString())
+        .order('pagamento_aprovado_em', { ascending: false })
+    );
+
+    if (!vendas || vendas.length === 0) {
+      return res.json({
+        message: 'Nenhuma venda encontrada para hoje',
+        data: [],
+        total: 0,
+        mikrotik_id: mikrotik_id,
+        date: hoje.toISOString().split('T')[0]
+      });
+    }
+
+    // Formatar dados no formato solicitado: user:senha:mac:minutos
+    const vendasFormatadas = vendas.map(venda => {
+      const usuario = venda.senha_id?.usuario || 'N/A';
+      const senha = venda.senha_id?.senha || 'N/A';
+      const mac = venda.mac_id?.mac_address || 'N/A';
+      const minutos = venda.plano_id?.duracao || 0;
+      
+      return `${usuario}:${senha}:${mac}:${minutos}`;
+    });
+
+    console.log(`[DAILY-SALES] Encontradas ${vendas.length} vendas para hoje`);
+
+    return res.json({
+      message: 'Vendas do dia encontradas com sucesso',
+      data: vendasFormatadas,
+      total: vendas.length,
+      mikrotik_id: mikrotik_id,
+      date: hoje.toISOString().split('T')[0],
+      detailed_data: vendas.map(venda => ({
+        id: venda.id,
+        usuario: venda.senha_id?.usuario,
+        senha: venda.senha_id?.senha,
+        mac: venda.mac_id?.mac_address,
+        minutos: venda.plano_id?.duracao,
+        plano: venda.plano_id?.nome,
+        valor: venda.preco,
+        pagamento_aprovado_em: venda.pagamento_aprovado_em
+      }))
+    });
 
   } catch (err) {
     next(err);

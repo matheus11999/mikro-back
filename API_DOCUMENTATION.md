@@ -1194,4 +1194,113 @@ Para dúvidas ou problemas com a API:
 - [Status da API (Health Check)](http://localhost:3000/api/captive-check/)
 
 ---
+
+## 📊 Vendas Diárias por Mikrotik
+
+### 6. 📈 Relatório de Vendas Diárias
+
+**Finalidade:** Listar todos os MACs que compraram senhas no mesmo dia para um Mikrotik específico.
+
+```http
+GET /daily-sales/{mikrotik_id}
+```
+
+**Parâmetros de Rota:**
+- `mikrotik_id`: UUID do Mikrotik
+
+**Resposta de Sucesso (200):**
+```json
+{
+  "message": "Vendas do dia encontradas com sucesso",
+  "data": [
+    "user_001:pass_001:AA:BB:CC:DD:EE:FF:60",
+    "user_002:pass_002:11:22:33:44:55:66:120",
+    "user_003:pass_003:77:88:99:AA:BB:CC:30"
+  ],
+  "total": 3,
+  "mikrotik_id": "550e8400-e29b-41d4-a716-446655440000",
+  "date": "2025-01-20",
+  "detailed_data": [
+    {
+      "id": "venda-uuid-1",
+      "usuario": "user_001",
+      "senha": "pass_001",
+      "mac": "AA:BB:CC:DD:EE:FF",
+      "minutos": 60,
+      "plano": "Plano 1 Hora",
+      "valor": 5.00,
+      "pagamento_aprovado_em": "2025-01-20T10:30:00.000Z"
+    }
+  ]
+}
+```
+
+**Resposta Sem Vendas (200):**
+```json
+{
+  "message": "Nenhuma venda encontrada para hoje",
+  "data": [],
+  "total": 0,
+  "mikrotik_id": "550e8400-e29b-41d4-a716-446655440000",
+  "date": "2025-01-20"
+}
+```
+
+**Exemplo cURL:**
+```bash
+curl -X GET http://localhost:3000/api/daily-sales/550e8400-e29b-41d4-a716-446655440000
+```
+
+**Exemplo JavaScript:**
+```javascript
+async function obterVendasDiarias(mikrotikId) {
+  try {
+    const response = await fetch(`http://localhost:3000/api/daily-sales/${mikrotikId}`);
+    const data = await response.json();
+
+    if (response.ok) {
+      console.log('Vendas do dia:', data.data);
+      console.log('Total de vendas:', data.total);
+      
+      // Formato: user:senha:mac:minutos
+      data.data.forEach(venda => {
+        const [usuario, senha, mac, minutos] = venda.split(':');
+        console.log(`Usuario: ${usuario}, MAC: ${mac}, Duração: ${minutos}min`);
+      });
+    } else {
+      console.error('Erro:', data.message);
+    }
+  } catch (error) {
+    console.error('Erro na requisição:', error);
+  }
+}
+
+// Exemplo de uso
+obterVendasDiarias('550e8400-e29b-41d4-a716-446655440000');
+```
+
+**Formato de Resposta:**
+O campo `data` contém um array de strings no formato:
+```
+user:senha:mac:minutos
+```
+
+Onde:
+- `user`: Nome de usuário da credencial
+- `senha`: Senha da credencial  
+- `mac`: Endereço MAC do dispositivo
+- `minutos`: Duração do plano em minutos
+
+**Casos de Uso:**
+- Relatórios diários de vendas
+- Monitoramento de atividade por Mikrotik
+- Integração com sistemas de gestão
+- Análise de performance de vendas
+
+**Horário de Referência:**
+- Considera o dia atual no timezone UTC
+- Inclui vendas aprovadas desde 00:00:00 até 23:59:59
+- Ordenação por horário de aprovação do pagamento (mais recente primeiro)
+
+---
 *Documentação gerada automaticamente • Versão 1.0 • Última atualização: 2025-01-20*
