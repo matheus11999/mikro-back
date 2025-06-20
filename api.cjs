@@ -1124,19 +1124,44 @@ app.post('/api/captive-check/poll-payment', async (req, res, next) => {
           });
         }
 
-        // Atualiza venda - valor agora representa a parte do cliente
-        await handleSupabaseOperation(() =>
-          supabaseAdmin
-            .from('vendas')
-            .update({
-              status: 'aprovado',
-              pagamento_aprovado_em: new Date().toISOString(),
-              senha_id: senha.id,
-              lucro: comissaoAdmin,
-              valor: comissaoDono
-            })
-            .eq('id', venda.id)
-        );
+                  // Atualiza venda - valor agora representa a parte do cliente
+          await handleSupabaseOperation(() =>
+            supabaseAdmin
+              .from('vendas')
+              .update({
+                status: 'aprovado',
+                pagamento_aprovado_em: new Date().toISOString(),
+                senha_id: senha.id,
+                lucro: comissaoAdmin,
+                valor: comissaoDono
+              })
+              .eq('id', venda.id)
+          );
+
+          // Enviar para Mikrotik automaticamente
+          try {
+            const mikrotikInfo = await handleSupabaseOperation(() =>
+              supabaseAdmin
+                .from('mikrotiks')
+                .select('webhook_url')
+                .eq('id', venda.mikrotik_id.id)
+                .single()
+            );
+
+            if (mikrotikInfo?.webhook_url) {
+              const userData = `${senha.usuario}:${senha.senha}:${venda.mac_id.mac_address}:${venda.plano_id.duracao}`;
+              
+              await fetch(mikrotikInfo.webhook_url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: userData
+              });
+
+              console.log('[WEBHOOK] Dados enviados para Mikrotik');
+            }
+          } catch (webhookError) {
+            console.log('[WEBHOOK] Erro ao enviar para Mikrotik:', webhookError);
+          }
 
         // Atualiza MAC
         await handleSupabaseOperation(() =>
@@ -1231,14 +1256,14 @@ app.get('/api/daily-sales/:mikrotik_id', async (req, res, next) => {
       return res.send('');
     }
 
-    // Formatar dados no formato solicitado: user:senha:mac:minutos
+    // Formatar dados no formato solicitado: user-senha-mac-minutos
     const vendasFormatadas = vendas.map(venda => {
       const usuario = venda.senha_id?.usuario || 'N/A';
       const senha = venda.senha_id?.senha || 'N/A';
       const mac = venda.mac_id?.mac_address || 'N/A';
       const minutos = venda.plano_id?.duracao || 0;
       
-      return `${usuario}:${senha}:${mac}:${minutos}`;
+      return `${usuario}-${senha}-${mac}-${minutos}`;
     });
 
     console.log(`[DAILY-SALES] Encontradas ${vendas.length} vendas para hoje`);
