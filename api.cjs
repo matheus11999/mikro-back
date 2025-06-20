@@ -1229,11 +1229,7 @@ app.get('/api/daily-sales/:mikrotik_id', async (req, res, next) => {
 
     if (!vendas || vendas.length === 0) {
       return res.json({
-        message: 'Nenhuma venda encontrada para hoje',
-        data: [],
-        total: 0,
-        mikrotik_id: mikrotik_id,
-        date: hoje.toISOString().split('T')[0]
+        data: []
       });
     }
 
@@ -1250,21 +1246,7 @@ app.get('/api/daily-sales/:mikrotik_id', async (req, res, next) => {
     console.log(`[DAILY-SALES] Encontradas ${vendas.length} vendas para hoje`);
 
     return res.json({
-      message: 'Vendas do dia encontradas com sucesso',
-      data: vendasFormatadas,
-      total: vendas.length,
-      mikrotik_id: mikrotik_id,
-      date: hoje.toISOString().split('T')[0],
-      detailed_data: vendas.map(venda => ({
-        id: venda.id,
-        usuario: venda.senha_id?.usuario,
-        senha: venda.senha_id?.senha,
-        mac: venda.mac_id?.mac_address,
-        minutos: venda.plano_id?.duracao,
-        plano: venda.plano_id?.nome,
-        valor: venda.preco,
-        pagamento_aprovado_em: venda.pagamento_aprovado_em
-      }))
+      data: vendasFormatadas
     });
 
   } catch (err) {
