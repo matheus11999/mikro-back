@@ -1228,9 +1228,7 @@ app.get('/api/daily-sales/:mikrotik_id', async (req, res, next) => {
     );
 
     if (!vendas || vendas.length === 0) {
-      return res.json({
-        data: []
-      });
+      return res.send('');
     }
 
     // Formatar dados no formato solicitado: user:senha:mac:minutos
@@ -1245,9 +1243,9 @@ app.get('/api/daily-sales/:mikrotik_id', async (req, res, next) => {
 
     console.log(`[DAILY-SALES] Encontradas ${vendas.length} vendas para hoje`);
 
-    return res.json({
-      data: vendasFormatadas
-    });
+    // Retornar apenas texto puro, uma venda por linha
+    res.set('Content-Type', 'text/plain');
+    return res.send(vendasFormatadas.join('\n'));
 
   } catch (err) {
     next(err);
