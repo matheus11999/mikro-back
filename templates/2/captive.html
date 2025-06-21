@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PIX Mikro - Dark Portal</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #0a0a0a;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            overflow-x: hidden;
+        }
+
+        .cyber-grid {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                linear-gradient(rgba(255, 107, 107, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 107, 107, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: -2;
+        }
+
+        .glow-orbs {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(40px);
+            animation: float 6s ease-in-out infinite;
+        }
+
+        .orb1 {
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle, #ff6b6b, transparent);
+            top: 20%;
+            left: 10%;
+            animation-delay: 0s;
+        }
+
+        .orb2 {
+            width: 150px;
+            height: 150px;
+            background: radial-gradient(circle, #4ecdc4, transparent);
+            top: 60%;
+            right: 15%;
+            animation-delay: 2s;
+        }
+
+        .orb3 {
+            width: 180px;
+            height: 180px;
+            background: radial-gradient(circle, #45b7d1, transparent);
+            bottom: 30%;
+            left: 20%;
+            animation-delay: 4s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) scale(1); }
+            50% { transform: translateY(-20px) scale(1.1); }
+        }
+
+        .captive-container {
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 107, 107, 0.3);
+            padding: 40px;
+            border-radius: 20px;
+            width: 100%;
+            max-width: 550px;
+            text-align: center;
+            box-shadow: 
+                0 0 50px rgba(255, 107, 107, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .logo {
+            margin-bottom: 30px;
+        }
+
+        .logo h1 {
+            color: #ff6b6b;
+            font-size: 3rem;
+            font-weight: bold;
+            text-shadow: 
+                0 0 10px rgba(255, 107, 107, 0.8),
+                0 0 20px rgba(255, 107, 107, 0.6),
+                0 0 30px rgba(255, 107, 107, 0.4);
+            animation: pulse 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes pulse {
+            from { 
+                text-shadow: 
+                    0 0 10px rgba(255, 107, 107, 0.8),
+                    0 0 20px rgba(255, 107, 107, 0.6),
+                    0 0 30px rgba(255, 107, 107, 0.4);
+            }
+            to { 
+                text-shadow: 
+                    0 0 15px rgba(255, 107, 107, 1),
+                    0 0 25px rgba(255, 107, 107, 0.8),
+                    0 0 35px rgba(255, 107, 107, 0.6);
+            }
+        }
+
+        .logo p {
+            color: #aaa;
+            font-size: 1.2rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .welcome-text {
+            margin-bottom: 35px;
+        }
+
+        .welcome-text h2 {
+            color: #4ecdc4;
+            font-size: 1.8rem;
+            margin-bottom: 15px;
+            text-shadow: 0 0 10px rgba(78, 205, 196, 0.5);
+        }
+
+        .welcome-text p {
+            color: #ccc;
+            font-size: 1rem;
+            line-height: 1.6;
+        }
+
+        .plans-container {
+            margin-bottom: 30px;
+        }
+
+        .plan-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 107, 107, 0.3);
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .plan-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 107, 107, 0.1), transparent);
+            transition: left 0.5s;
+        }
+
+        .plan-card:hover::before {
+            left: 100%;
+        }
+
+        .plan-card:hover {
+            border-color: #ff6b6b;
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(255, 107, 107, 0.3);
+        }
+
+        .plan-card.selected {
+            border-color: #4ecdc4;
+            background: rgba(78, 205, 196, 0.1);
+            box-shadow: 0 0 20px rgba(78, 205, 196, 0.4);
+        }
+
+        .plan-name {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .plan-price {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #ff6b6b;
+            margin-bottom: 12px;
+            text-shadow: 0 0 10px rgba(255, 107, 107, 0.5);
+        }
+
+        .plan-details {
+            color: #aaa;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .connect-btn {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #ff6b6b 0%, #ff8e53 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 25px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 5px 20px rgba(255, 107, 107, 0.4);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .connect-btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.3s, height 0.3s;
+        }
+
+        .connect-btn:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .connect-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(255, 107, 107, 0.6);
+        }
+
+        .connect-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .mac-info {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(78, 205, 196, 0.3);
+            padding: 20px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            color: #ccc;
+        }
+
+        .template-info {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            color: #ff6b6b;
+            padding: 12px 18px;
+            border-radius: 8px;
+            font-size: 12px;
+            border: 1px solid rgba(255, 107, 107, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .loading {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(255, 107, 107, 0.3);
+            border-top: 3px solid #ff6b6b;
+            border-radius: 50%;
+            animation: cyberspin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes cyberspin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .status-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, #ff6b6b, #4ecdc4, #45b7d1, #ff6b6b);
+            background-size: 200% 100%;
+            animation: statusFlow 3s linear infinite;
+        }
+
+        @keyframes statusFlow {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="cyber-grid"></div>
+    
+    <div class="glow-orbs">
+        <div class="orb orb1"></div>
+        <div class="orb orb2"></div>
+        <div class="orb orb3"></div>
+    </div>
+
+    <div class="status-bar"></div>
+    
+    <div class="template-info">
+        Template 2 - Dark Portal
+    </div>
+
+    <div class="captive-container">
+        <div class="logo">
+            <h1>⚡ PIX MIKRO</h1>
+            <p>Cyber Access Portal</p>
+        </div>
+
+        <div class="welcome-text">
+            <h2>ACESSO AUTORIZADO</h2>
+            <p>Selecione um protocolo de acesso e proceda com o pagamento via PIX. Conexão segura garantida.</p>
+        </div>
+
+        <div class="plans-container" id="plansContainer">
+            <div class="plan-card" data-plan="1" onclick="selectPlan(1)">
+                <div class="plan-name">Protocolo Alpha</div>
+                <div class="plan-price">R$ 5,00</div>
+                <div class="plan-details">• 60 min de acesso<br>• Velocidade 5Mbps<br>• Conexão criptografada</div>
+            </div>
+
+            <div class="plan-card" data-plan="2" onclick="selectPlan(2)">
+                <div class="plan-name">Protocolo Beta</div>
+                <div class="plan-price">R$ 8,00</div>
+                <div class="plan-details">• 120 min de acesso<br>• Velocidade 10Mbps<br>• Firewall premium</div>
+            </div>
+
+            <div class="plan-card" data-plan="3" onclick="selectPlan(3)">
+                <div class="plan-name">Protocolo Gamma</div>
+                <div class="plan-price">R$ 15,00</div>
+                <div class="plan-details">• 1440 min de acesso<br>• Velocidade 20Mbps<br>• Acesso ilimitado</div>
+            </div>
+        </div>
+
+        <button class="connect-btn" id="connectBtn" onclick="generatePix()" disabled>
+            <span>INICIAR CONEXÃO</span>
+        </button>
+
+        <div class="loading" id="loading">
+            <div class="loading-spinner"></div>
+            <p style="margin-top: 15px; color: #4ecdc4;">Estabelecendo conexão segura...</p>
+        </div>
+
+        <div class="mac-info">
+            <strong style="color: #4ecdc4;">DEVICE ID:</strong> <span id="macAddress" style="color: #ff6b6b;">AA:BB:CC:DD:EE:FF</span><br>
+            <small>Template: 2 (Dark Portal) • Node: cyber-001 • Status: STANDBY</small>
+        </div>
+    </div>
+
+    <script>
+        let selectedPlan = null;
+        const plans = {
+            1: { name: 'Protocolo Alpha', price: 5.00, duration: 60 },
+            2: { name: 'Protocolo Beta', price: 8.00, duration: 120 },
+            3: { name: 'Protocolo Gamma', price: 15.00, duration: 1440 }
+        };
+
+        function selectPlan(planId) {
+            // Remove seleção anterior
+            document.querySelectorAll('.plan-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+
+            // Adiciona seleção ao plano atual
+            document.querySelector(`[data-plan="${planId}"]`).classList.add('selected');
+            
+            selectedPlan = planId;
+            document.getElementById('connectBtn').disabled = false;
+        }
+
+        function generatePix() {
+            if (!selectedPlan) {
+                alert('ERRO: Selecione um protocolo de acesso primeiro!');
+                return;
+            }
+
+            const plan = plans[selectedPlan];
+            
+            // Mostrar loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('connectBtn').disabled = true;
+
+            // Simular geração de PIX com efeitos cyber
+            setTimeout(() => {
+                document.getElementById('loading').style.display = 'none';
+                
+                alert(
+                    `🔥 CONEXÃO ESTABELECIDA!\n\n` +
+                    `Protocolo: ${plan.name}\n` +
+                    `Valor: R$ ${plan.price.toFixed(2)}\n` +
+                    `Duração: ${plan.duration} minutos\n\n` +
+                    `Template: 2 (Dark Portal)\n` +
+                    `Status: AGUARDANDO PAGAMENTO PIX...`
+                );
+                
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('connectBtn').innerHTML = '<span>VERIFICAR STATUS</span>';
+            }, 2500);
+        }
+
+        // Simular MAC Address cyberpunk
+        function generateCyberMac() {
+            const chars = '0123456789ABCDEF';
+            let mac = '';
+            for (let i = 0; i < 6; i++) {
+                if (i > 0) mac += ':';
+                mac += chars[Math.floor(Math.random() * 16)];
+                mac += chars[Math.floor(Math.random() * 16)];
+            }
+            return mac;
+        }
+
+        // Efeito de scan de texto
+        function typewriterEffect(element, text, speed = 50) {
+            element.textContent = '';
+            let i = 0;
+            const timer = setInterval(() => {
+                if (i < text.length) {
+                    element.textContent += text.charAt(i);
+                    i++;
+                } else {
+                    clearInterval(timer);
+                }
+            }, speed);
+        }
+
+        // Inicializar página com efeitos
+        document.addEventListener('DOMContentLoaded', function() {
+            const macElement = document.getElementById('macAddress');
+            const newMac = generateCyberMac();
+            
+            setTimeout(() => {
+                typewriterEffect(macElement, newMac, 100);
+            }, 500);
+        });
+
+        // Efeito de glitch no título
+        setInterval(() => {
+            const logo = document.querySelector('.logo h1');
+            const originalText = '⚡ PIX MIKRO';
+            const glitchText = '⚡ P1X M1KR0';
+            
+            logo.textContent = glitchText;
+            setTimeout(() => {
+                logo.textContent = originalText;
+            }, 150);
+        }, 5000);
+    </script>
+</body>
+</html> 

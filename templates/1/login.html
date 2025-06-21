@@ -1,0 +1,1297 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WiFi Premium - Conexão Rápida</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        :root {
+            --primary: #00D9FF;
+            --primary-dark: #00A8CC;
+            --secondary: #7C3AED;
+            --success: #10B981;
+            --error: #EF4444;
+            --warning: #F59E0B;
+            --dark: #1F2937;
+            --light: #F9FAFB;
+            --gray: #6B7280;
+            --white: #FFFFFF;
+            --shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            --radius: 16px;
+            --radius-lg: 24px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Animated Background */
+        .bg-animation {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            z-index: 0;
+            opacity: 0.3;
+        }
+
+        .bg-animation span {
+            position: absolute;
+            display: block;
+            width: 20px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            animation: move 25s linear infinite;
+            bottom: -150px;
+        }
+
+        @keyframes move {
+            0% { transform: translateY(0) rotate(0deg); opacity: 1; border-radius: 0; }
+            100% { transform: translateY(-1000px) rotate(720deg); opacity: 0; border-radius: 50%; }
+        }
+
+        /* Main Container */
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            max-width: 450px;
+            width: 100%;
+            position: relative;
+            z-index: 1;
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            padding: 30px 30px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .logo {
+            width: 70px;
+            height: 70px;
+            background: var(--white);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 35px;
+            margin: 0 auto 15px;
+            position: relative;
+            z-index: 1;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .header h1 {
+            color: var(--white);
+            font-size: 24px;
+            font-weight: 800;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 14px;
+        }
+
+        /* Content */
+        .content {
+            padding: 30px;
+        }
+
+        .screen {
+            display: none;
+        }
+
+        .screen.active {
+            display: block;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Password Login Screen */
+        .password-login {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .password-login h2 {
+            color: var(--dark);
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            color: var(--dark);
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 16px;
+            border: 2px solid #E5E7EB;
+            border-radius: var(--radius);
+            font-size: 16px;
+            transition: var(--transition);
+            background: var(--white);
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(0, 217, 255, 0.1);
+        }
+
+        .error-message {
+            background: #FEF2F2;
+            border: 1px solid #FECACA;
+            color: #B91C1C;
+            padding: 12px;
+            border-radius: var(--radius);
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        /* Plans Screen */
+        .plans-grid {
+            display: grid;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .plan-card {
+            background: var(--light);
+            border: 2px solid #E5E7EB;
+            border-radius: var(--radius);
+            padding: 20px;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .plan-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+
+        .plan-card.selected {
+            border-color: var(--primary);
+            background: rgba(0, 217, 255, 0.05);
+        }
+
+        .plan-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: var(--primary);
+            transform: scaleX(0);
+            transition: var(--transition);
+        }
+
+        .plan-card.selected::before {
+            transform: scaleX(1);
+        }
+
+        .plan-name {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--dark);
+            margin-bottom: 8px;
+        }
+
+        .plan-price {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+
+        .plan-features {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .plan-features li {
+            color: var(--gray);
+            margin-bottom: 5px;
+            position: relative;
+            padding-left: 20px;
+        }
+
+        .plan-features li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: var(--success);
+            font-weight: bold;
+        }
+
+        /* Instructions Screen */
+        .instructions {
+            text-align: center;
+            padding: 20px 0;
+        }
+
+        .instructions h2 {
+            color: var(--dark);
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+
+        .steps {
+            list-style: none;
+            margin: 0 0 30px 0;
+            padding: 0;
+        }
+
+        .steps li {
+            background: var(--light);
+            border-left: 4px solid var(--primary);
+            padding: 15px 20px;
+            margin-bottom: 10px;
+            border-radius: 0 var(--radius) var(--radius) 0;
+            text-align: left;
+            position: relative;
+        }
+
+        .steps li .step-number {
+            position: absolute;
+            left: -2px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--primary);
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .steps li .step-text {
+            margin-left: 30px;
+            color: var(--dark);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .access-info {
+            background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+            border-radius: var(--radius);
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .access-info .icon {
+            font-size: 40px;
+            margin-bottom: 10px;
+        }
+
+        .access-info h3 {
+            color: var(--warning);
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .access-info p {
+            color: #92400E;
+            font-size: 14px;
+        }
+
+        /* PIX Payment Screen */
+        .pix-container {
+            text-align: center;
+        }
+
+        .qr-container {
+            background: var(--white);
+            padding: 20px;
+            border-radius: var(--radius);
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+        }
+
+        .qr-container img {
+            max-width: 200px;
+            height: auto;
+        }
+
+        .pix-code-container {
+            background: var(--light);
+            border: 2px dashed var(--primary);
+            border-radius: var(--radius);
+            padding: 15px;
+            margin-bottom: 20px;
+            word-break: break-all;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: var(--dark);
+        }
+
+        .trial-notice {
+            background: linear-gradient(135deg, #DBEAFE 0%, #BFDBFE 100%);
+            border-radius: var(--radius);
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .trial-notice .icon {
+            font-size: 30px;
+            margin-bottom: 8px;
+        }
+
+        .trial-notice h4 {
+            color: var(--primary-dark);
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .trial-notice p {
+            color: #1E40AF;
+            font-size: 13px;
+        }
+
+        /* Button Styles */
+        .btn {
+            width: 100%;
+            padding: 16px 24px;
+            border: none;
+            border-radius: var(--radius);
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-decoration: none;
+            margin-bottom: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: var(--white);
+            box-shadow: 0 4px 14px 0 rgba(0, 217, 255, 0.39);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px 0 rgba(0, 217, 255, 0.5);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
+            color: var(--white);
+        }
+
+        .btn-success:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px 0 rgba(16, 185, 129, 0.5);
+        }
+
+        .btn-secondary {
+            background: #6B7280;
+            color: var(--white);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .btn.loading {
+            position: relative;
+            color: transparent;
+        }
+
+        .btn.loading::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border: 2px solid transparent;
+            border-top: 2px solid currentColor;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: var(--white);
+        }
+
+        @keyframes spin {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+
+        .btn.copied {
+            background: var(--success) !important;
+        }
+
+        /* Timer */
+        .timer {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: rgba(239, 68, 68, 0.1);
+            border-radius: var(--radius);
+        }
+
+        .timer-text {
+            color: var(--error);
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .timer-value {
+            color: var(--error);
+            font-size: 24px;
+            font-weight: 800;
+            margin-top: 5px;
+        }
+
+        /* Success Screen */
+        .success-container {
+            text-align: center;
+        }
+
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background: var(--success);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            color: var(--white);
+            font-size: 40px;
+        }
+
+        .credentials {
+            background: var(--light);
+            border-radius: var(--radius);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .credential-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: var(--white);
+            border-radius: 8px;
+        }
+
+        .credential-label {
+            color: var(--gray);
+            font-size: 14px;
+        }
+
+        .credential-value {
+            color: var(--dark);
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Debug Info */
+        .debug-info {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            font-family: monospace;
+            max-width: 300px;
+            word-break: break-all;
+            z-index: 1000;
+            display: none;
+        }
+
+        .debug-info.show {
+            display: block;
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .container {
+                margin: 10px;
+                max-width: none;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+            
+            .plan-price {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- MikroTik Hidden Form -->
+    <form name="sendin" action="$(link-login-only)" method="post" style="display:none">
+        <input type="hidden" name="username" />
+        <input type="hidden" name="password" />
+        <input type="hidden" name="dst" value="$(link-orig)" />
+        <input type="hidden" name="popup" value="true" />
+    </form>
+
+    <!-- Animated Background -->
+    <div class="bg-animation">
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+    </div>
+
+    <!-- Debug Info -->
+    <div id="debugInfo" class="debug-info"></div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">🌐</div>
+            <h1>WiFi Premium</h1>
+            <p>Conexão rápida e segura</p>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <!-- Password Login Screen -->
+            <div id="passwordScreen" class="screen active">
+                <div class="password-login">
+                    <h2>Já tem uma senha de acesso?</h2>
+                    
+                    $(if error)
+                    <div class="error-message">
+                        <strong>Erro!</strong> $(error)
+                    </div>
+                    $(endif)
+
+                    <form name="login" action="$(link-login-only)" method="post" $(if chap-id) onSubmit="return doLogin()" $(endif)>
+                        <input type="hidden" name="dst" value="$(link-orig)" />
+                        <input type="hidden" name="popup" value="true" />
+                        
+                        <div class="form-group">
+                            <label for="username">Digite sua senha:</label>
+                            <input type="text" 
+                                   name="username" 
+                                   id="username"
+                                   value="$(username)" 
+                                   placeholder="Digite a senha aqui..." 
+                                   required />
+                            <input type="hidden" name="password" value=""/>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">
+                            <span>🚀</span>
+                            <span>CONECTAR</span>
+                        </button>
+                    </form>
+
+                    $(if trial == 'yes')
+                    <button onclick="activateFreeTrial()" class="btn btn-secondary">
+                        <span>🎁</span>
+                        <span>TESTE GRÁTIS</span>
+                    </button>
+                    $(endif)
+
+                    <button onclick="showPlansScreen()" class="btn btn-success">
+                        <span>💳</span>
+                        <span>COMPRAR ACESSO VIA PIX</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Plans Selection Screen -->
+            <div id="plansScreen" class="screen">
+                <h2 style="text-align: center; color: var(--dark); margin-bottom: 25px; font-size: 20px;">
+                    Escolha seu plano de internet
+                </h2>
+                
+                <div id="plansContainer" class="plans-grid">
+                    <!-- Plans will be loaded here -->
+                </div>
+
+                <button id="selectPlanBtn" class="btn btn-primary" disabled>
+                    <span>📱</span>
+                    <span>Selecionar Plano</span>
+                </button>
+
+                <button onclick="showPasswordScreen()" class="btn btn-secondary">
+                    <span>←</span>
+                    <span>Voltar</span>
+                </button>
+            </div>
+
+            <!-- Instructions Screen -->
+            <div id="instructionsScreen" class="screen">
+                <div class="instructions">
+                    <h2>Como funciona?</h2>
+                    
+                    <div class="access-info">
+                        <div class="icon">⏱️</div>
+                        <h3>Acesso Liberado por 5 Minutos</h3>
+                        <p>Você terá acesso gratuito para fazer o pagamento via PIX</p>
+                    </div>
+
+                    <ol class="steps">
+                        <li>
+                            <div class="step-number">1</div>
+                            <div class="step-text">
+                                <strong>Copie a chave PIX</strong><br>
+                                Use o botão "Copiar" para copiar o código PIX automaticamente
+                            </div>
+                        </li>
+                        <li>
+                            <div class="step-number">2</div>
+                            <div class="step-text">
+                                <strong>Faça o pagamento</strong><br>
+                                Abra seu banco e cole o código PIX ou escaneie o QR Code
+                            </div>
+                        </li>
+                        <li>
+                            <div class="step-number">3</div>
+                            <div class="step-text">
+                                <strong>Acesso automático</strong><br>
+                                Após o pagamento, sua internet será liberada automaticamente
+                            </div>
+                        </li>
+                    </ol>
+
+                    <button id="continueBtn" class="btn btn-primary">
+                        <span>▶️</span>
+                        <span>Continuar</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- PIX Payment Screen -->
+            <div id="pixScreen" class="screen">
+                <div class="pix-container">
+                    <h2 style="text-align: center; color: var(--dark); margin-bottom: 20px;">
+                        Pagamento PIX
+                    </h2>
+
+                    <div class="trial-notice" id="trialNotice">
+                        <div class="icon">🎁</div>
+                        <h4>Preparando acesso...</h4>
+                        <p>Aguarde enquanto liberamos seu acesso temporário</p>
+                    </div>
+
+                    <div class="timer">
+                        <div class="timer-text">Tempo para pagamento</div>
+                        <div id="timer" class="timer-value">5:00</div>
+                    </div>
+
+                    <div id="qrContainer" class="qr-container">
+                        <div id="qrCode">
+                            <!-- QR Code will be inserted here -->
+                        </div>
+                    </div>
+
+                    <div class="pix-code-container">
+                        <div style="margin-bottom: 10px; font-weight: bold; color: var(--dark);">
+                            Chave PIX:
+                        </div>
+                        <div id="pixCode">
+                            <!-- PIX code will be inserted here -->
+                        </div>
+                    </div>
+
+                    <button id="copyBtn" class="btn btn-success">
+                        <span>📋</span>
+                        <span>Copiar Chave PIX</span>
+                    </button>
+
+                    <div style="text-align: center; margin-top: 15px;">
+                        <small style="color: var(--gray);">
+                            O pagamento será detectado automaticamente
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Success Screen -->
+            <div id="successScreen" class="screen">
+                <div class="success-container">
+                    <div class="success-icon">✓</div>
+                    
+                    <h2 style="color: var(--dark); margin-bottom: 20px;">
+                        Pagamento Aprovado!
+                    </h2>
+
+                    <div class="credentials">
+                        <div class="credential-item">
+                            <span class="credential-label">Usuário:</span>
+                            <span id="successUsername" class="credential-value">-</span>
+                        </div>
+                        <div class="credential-item">
+                            <span class="credential-label">Senha:</span>
+                            <span id="successPassword" class="credential-value">-</span>
+                        </div>
+                        <div class="credential-item">
+                            <span class="credential-label">Duração:</span>
+                            <span id="duration" class="credential-value">-</span>
+                        </div>
+                    </div>
+
+                    <button id="connectBtn" class="btn btn-primary">
+                        <span>🚀</span>
+                        <span>Conectar Agora</span>
+                    </button>
+
+                    <div style="text-align: center; margin-top: 15px;">
+                        <small style="color: var(--gray);">
+                            Redirecionamento automático em <span id="redirectTimer">5</span> segundos
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        const state = {
+            mac: null,
+            ip: null,
+            interface: null,
+            linkOrig: null,
+            linkLogin: null,
+            mikrotikId: null,
+            apiUrl: null,
+            debug: false,
+            selectedPlan: null,
+            paymentId: null,
+            checkInterval: null,
+            timerInterval: null,
+            startTime: null,
+            trialActivated: false,
+            plans: []
+        };
+
+        // MikroTik CHAP Authentication - only add if chap-id exists
+        function doLogin() {
+            if (document.sendin) {
+                document.sendin.username.value = document.login.username.value;
+                document.sendin.password.value = document.login.username.value;
+                document.sendin.submit();
+                return false;
+            }
+            return true;
+        }
+
+        // Utility Functions
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function showPasswordScreen() {
+            showScreen('passwordScreen');
+        }
+
+        function showPlansScreen() {
+            showScreen('plansScreen');
+            loadPlans();
+        }
+
+        function formatDuration(minutes) {
+            if (minutes >= 1440) {
+                return Math.floor(minutes / 1440) + ' dia(s)';
+            } else if (minutes >= 60) {
+                return Math.floor(minutes / 60) + ' hora(s)';
+            } else {
+                return minutes + ' minuto(s)';
+            }
+        }
+
+        function updateDebugInfo() {
+            const debugDiv = document.getElementById('debugInfo');
+            if (state.debug) {
+                debugDiv.innerHTML = 
+                    '<strong>DEBUG INFO:</strong><br>' +
+                    'MAC: ' + (state.mac || 'N/A') + '<br>' +
+                    'IP: ' + (state.ip || 'N/A') + '<br>' +
+                    'Interface: ' + (state.interface || 'N/A') + '<br>' +
+                    'Mikrotik ID: ' + (state.mikrotikId || 'N/A') + '<br>' +
+                    'API URL: ' + (state.apiUrl || 'N/A') + '<br>' +
+                    'Link Login: ' + (state.linkLogin || 'N/A') + '<br>' +
+                    'Link Orig: ' + (state.linkOrig || 'N/A');
+                debugDiv.classList.add('show');
+            } else {
+                debugDiv.classList.remove('show');
+            }
+        }
+
+        // URL Parameters Processing
+        function getUrlParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            // Get MikroTik data from URL or fallback to MikroTik variables
+            state.mac = urlParams.get('mac') || 'AA:BB:CC:DD:EE:FF';
+            state.ip = urlParams.get('ip') || '192.168.1.100';
+            state.interface = urlParams.get('interface') || 'wlan1';
+            state.linkOrig = urlParams.get('link-orig') || '';
+            state.linkLogin = urlParams.get('link-login') || 'http://10.5.50.1/login';
+            
+            // Get configuration data
+            state.mikrotikId = urlParams.get('mikrotik_id') || '78957cd3-7096-4acd-970b-0aa0a768c555';
+            state.apiUrl = urlParams.get('api_url') || 'https://api.lucro.top';
+            state.debug = urlParams.get('debug') === 'true';
+
+            updateDebugInfo();
+            
+            console.log('URL Parameters processed:', state);
+        }
+
+        // Free Trial Function
+        function activateFreeTrial() {
+            const trialUrl = state.linkLogin + '?dst=' + encodeURIComponent(state.linkOrig) + '&username=T-' + state.mac.replace(/:/g, '');
+            window.location.href = trialUrl;
+        }
+
+        // Plans Management
+        async function loadPlans() {
+            try {
+                const response = await fetch(state.apiUrl + '/api/planos/' + state.mikrotikId, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const data = await response.json();
+                
+                if (data && data.length > 0) {
+                    state.plans = data;
+                    displayPlans(data);
+                } else {
+                    throw new Error('Nenhum plano encontrado');
+                }
+            } catch (error) {
+                console.error('Error loading plans:', error);
+                // Fallback plans
+                const fallbackPlans = [
+                    {
+                        id: 1,
+                        nome: 'Plano 1 Hora',
+                        preco: 5.00,
+                        duracao: 60,
+                        features: ['1 hora de acesso', 'Velocidade 10Mbps', 'Navegação ilimitada']
+                    },
+                    {
+                        id: 2,
+                        nome: 'Plano 2 Horas',
+                        preco: 8.00,
+                        duracao: 120,
+                        features: ['2 horas de acesso', 'Velocidade 15Mbps', 'Navegação ilimitada']
+                    },
+                    {
+                        id: 3,
+                        nome: 'Plano Dia Todo',
+                        preco: 15.00,
+                        duracao: 1440,
+                        features: ['24 horas de acesso', 'Velocidade 20Mbps', 'Navegação ilimitada']
+                    }
+                ];
+                state.plans = fallbackPlans;
+                displayPlans(fallbackPlans);
+            }
+        }
+
+        function displayPlans(plans) {
+            const container = document.getElementById('plansContainer');
+            
+            let htmlContent = '';
+            plans.forEach(function(plan) {
+                const features = plan.features || [formatDuration(plan.duracao) + ' de acesso', 'Velocidade alta', 'Navegação ilimitada'];
+                let featuresHtml = '';
+                features.forEach(function(feature) {
+                    featuresHtml += '<li>' + feature + '</li>';
+                });
+                
+                htmlContent += 
+                    '<div class="plan-card" onclick="selectPlan(' + plan.id + ')" data-plan-id="' + plan.id + '">' +
+                        '<div class="plan-name">' + plan.nome + '</div>' +
+                        '<div class="plan-price">R$ ' + Number(plan.preco).toFixed(2) + '</div>' +
+                        '<ul class="plan-features">' +
+                            featuresHtml +
+                        '</ul>' +
+                    '</div>';
+            });
+            
+            container.innerHTML = htmlContent;
+        }
+
+        function selectPlan(planId) {
+            // Remove previous selection
+            document.querySelectorAll('.plan-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            
+            // Add selection to clicked plan
+            const planCard = document.querySelector('[data-plan-id="' + planId + '"]');
+            planCard.classList.add('selected');
+            
+            // Store selected plan
+            state.selectedPlan = state.plans.find(plan => plan.id === planId);
+            
+            // Enable select button
+            const btn = document.getElementById('selectPlanBtn');
+            btn.disabled = false;
+            btn.innerHTML = 
+                '<span>💳</span>' +
+                '<span>Pagar R$ ' + Number(state.selectedPlan.preco).toFixed(2) + ' - ' + state.selectedPlan.nome + '</span>';
+        }
+
+        // Trial Management
+        async function activateTrial() {
+            if (state.trialActivated) return;
+            
+            try {
+                console.log('Ativando trial de 5 minutos...');
+                
+                // Generate trial username
+                const trialUsername = 'T-' + state.mac.replace(/:/g, '');
+                
+                // Trial URL for MikroTik
+                let trialUrl = state.linkLogin || 'http://10.5.50.1/login';
+                
+                if (trialUrl.includes('?')) {
+                    trialUrl += '&username=' + encodeURIComponent(trialUsername) + '&password=trial';
+                } else {
+                    trialUrl += '?username=' + encodeURIComponent(trialUsername) + '&password=trial';
+                }
+                
+                if (state.linkOrig) {
+                    trialUrl += '&dst=' + encodeURIComponent(state.linkOrig);
+                }
+                
+                console.log('Trial URL:', trialUrl);
+                
+                // Create hidden iframe to activate trial
+                const iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                iframe.src = trialUrl;
+                document.body.appendChild(iframe);
+                
+                // Remove iframe after 5 seconds
+                setTimeout(() => {
+                    if (document.body.contains(iframe)) {
+                        document.body.removeChild(iframe);
+                    }
+                }, 5000);
+                
+                state.trialActivated = true;
+                console.log('Trial ativado com sucesso!');
+                
+                // Show trial notice
+                showTrialNotice();
+                
+            } catch (error) {
+                console.error('Erro ao ativar trial:', error);
+                // Continue anyway, as the trial might still work
+                state.trialActivated = true;
+                showTrialNotice();
+            }
+        }
+
+        function showTrialNotice() {
+            // Update trial notice to show activated status
+            const trialNotice = document.getElementById('trialNotice');
+            if (trialNotice) {
+                trialNotice.innerHTML = 
+                    '<div class="icon">✅</div>' +
+                    '<h4>Acesso Liberado!</h4>' +
+                    '<p>Você tem 5 minutos de acesso gratuito para fazer o pagamento</p>';
+                trialNotice.style.background = 'linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%)';
+            }
+        }
+
+        // PIX Payment
+        async function generatePix() {
+            if (!state.selectedPlan) return;
+            
+            const btn = document.getElementById('selectPlanBtn');
+            btn.classList.add('loading');
+            btn.disabled = true;
+
+            try {
+                const response = await fetch(state.apiUrl + '/api/pix', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        mac: state.mac,
+                        mikrotik_id: state.mikrotikId,
+                        plano_id: state.selectedPlan.id,
+                        preco: Number(state.selectedPlan.preco),
+                        descricao: 'WiFi - ' + state.selectedPlan.nome
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.chave_pix && data.qrcode) {
+                    state.paymentId = data.id || data.payment_id;
+                    showPixPayment(data);
+                    startPaymentCheck();
+                } else {
+                    throw new Error('Erro ao gerar PIX');
+                }
+                
+            } catch (error) {
+                console.error('Error generating PIX:', error);
+                alert('Erro ao gerar PIX. Tente novamente.');
+            } finally {
+                btn.classList.remove('loading');
+                btn.disabled = false;
+            }
+        }
+
+        function showPixPayment(pixData) {
+            showScreen('pixScreen');
+            
+            // Display QR Code
+            const qrContainer = document.getElementById('qrCode');
+            qrContainer.innerHTML = '<img src="data:image/png;base64,' + pixData.qrcode + '" alt="QR Code PIX" style="width: 200px; height: 200px;">';
+            
+            // Display PIX Code
+            document.getElementById('pixCode').textContent = pixData.chave_pix;
+            
+            // Start timer
+            startTimer();
+        }
+
+        async function copyPixCode() {
+            const code = document.getElementById('pixCode').textContent;
+            const btn = document.getElementById('copyBtn');
+            
+            try {
+                await navigator.clipboard.writeText(code);
+                
+                btn.classList.add('copied');
+                btn.innerHTML = 
+                    '<span>✅</span>' +
+                    '<span>Copiado!</span>';
+                
+                console.log('PIX copiado - aguardando 15 segundos para ativar trial...');
+                
+                // Activate trial after copying PIX (15 seconds delay)
+                setTimeout(async () => {
+                    console.log('15 segundos passaram - ativando trial...');
+                    await activateTrial();
+                }, 15000);
+                
+                // Reset button after 3 seconds
+                setTimeout(() => {
+                    btn.classList.remove('copied');
+                    btn.innerHTML = 
+                        '<span>📋</span>' +
+                        '<span>Copiar Chave PIX</span>';
+                }, 3000);
+                
+            } catch (err) {
+                console.error('Error copying:', err);
+                alert('Erro ao copiar. Use Ctrl+C para copiar manualmente.');
+            }
+        }
+
+        // Payment Checking
+        async function checkPayment() {
+            if (!state.paymentId) return;
+            
+            try {
+                const response = await fetch(state.apiUrl + '/api/poll-payment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        payment_id: state.paymentId
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.status === 'approved' && data.username && data.password) {
+                    stopChecking();
+                    showSuccessScreen(data);
+                } else if (data.status === 'error' || data.status === 'expired') {
+                    stopChecking();
+                    alert('Pagamento expirado ou cancelado');
+                    showPasswordScreen();
+                }
+            } catch (error) {
+                console.error('Error checking payment:', error);
+            }
+        }
+
+        function startPaymentCheck() {
+            state.checkInterval = setInterval(checkPayment, 5000);
+            checkPayment(); // Check immediately
+        }
+
+        function stopChecking() {
+            if (state.checkInterval) {
+                clearInterval(state.checkInterval);
+                state.checkInterval = null;
+            }
+            if (state.timerInterval) {
+                clearInterval(state.timerInterval);
+                state.timerInterval = null;
+            }
+        }
+
+        // Timer Management
+        function startTimer() {
+            const duration = 5 * 60; // 5 minutes in seconds
+            let timeLeft = duration;
+            
+            state.timerInterval = setInterval(() => {
+                const minutes = Math.floor(timeLeft / 60);
+                const seconds = timeLeft % 60;
+                
+                document.getElementById('timer').textContent = 
+                    minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
+                
+                if (timeLeft <= 0) {
+                    clearInterval(state.timerInterval);
+                    alert('Tempo esgotado. Tente novamente.');
+                    showPasswordScreen();
+                }
+                
+                timeLeft--;
+            }, 1000);
+        }
+
+        // Success Screen
+        function showSuccessScreen(data) {
+            showScreen('successScreen');
+            
+            document.getElementById('successUsername').textContent = data.username;
+            document.getElementById('successPassword').textContent = data.password;
+            document.getElementById('duration').textContent = formatDuration(data.duracao || state.selectedPlan.duracao || 60);
+            
+            // Auto redirect countdown
+            let countdown = 5;
+            const interval = setInterval(() => {
+                countdown--;
+                document.getElementById('redirectTimer').textContent = countdown;
+                
+                if (countdown <= 0) {
+                    clearInterval(interval);
+                    loginAndRedirect(data.username, data.password);
+                }
+            }, 1000);
+        }
+
+        function loginAndRedirect(username, password) {
+            let loginUrl = state.linkLogin;
+            
+            if (loginUrl.includes('?')) {
+                loginUrl += '&username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password);
+            } else {
+                loginUrl += '?username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password);
+            }
+            
+            if (state.linkOrig) {
+                loginUrl += '&dst=' + encodeURIComponent(state.linkOrig);
+            }
+            
+            console.log('Redirecting to:', loginUrl);
+            window.location.href = loginUrl;
+        }
+
+        // Event Listeners
+        document.getElementById('selectPlanBtn').addEventListener('click', () => {
+            showScreen('instructionsScreen');
+        });
+
+        document.getElementById('continueBtn').addEventListener('click', () => {
+            generatePix();
+        });
+
+        document.getElementById('copyBtn').addEventListener('click', copyPixCode);
+
+        document.getElementById('connectBtn').addEventListener('click', () => {
+            const username = document.getElementById('successUsername').textContent;
+            const password = document.getElementById('successPassword').textContent;
+            loginAndRedirect(username, password);
+        });
+
+        // Focus on username input
+        document.addEventListener('DOMContentLoaded', function() {
+            const usernameInput = document.getElementById('username');
+            if (usernameInput) {
+                usernameInput.focus();
+            }
+        });
+
+        // Initialize
+        window.addEventListener('DOMContentLoaded', () => {
+            getUrlParams();
+        });
+    </script>
+</body>
+</html> 

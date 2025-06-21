@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PIX Mikro - Template 2 - Login</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #1a1a1a;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+        }
+
+        .background-pattern {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 50%, #ff6b6b 0%, transparent 20%),
+                radial-gradient(circle at 80% 20%, #4ecdc4 0%, transparent 20%),
+                radial-gradient(circle at 40% 80%, #45b7d1 0%, transparent 20%);
+            opacity: 0.1;
+            z-index: -1;
+        }
+
+        .login-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 40px;
+            border-radius: 15px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo h1 {
+            color: #ff6b6b;
+            font-size: 2.2rem;
+            font-weight: bold;
+            text-shadow: 0 0 20px rgba(255, 107, 107, 0.5);
+        }
+
+        .logo p {
+            color: #ccc;
+            margin-top: 8px;
+            font-size: 1rem;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #ddd;
+            font-weight: 500;
+            text-transform: uppercase;
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 15px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            font-size: 16px;
+            color: #fff;
+            backdrop-filter: blur(5px);
+            transition: all 0.3s ease;
+        }
+
+        .form-group input::placeholder {
+            color: #aaa;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #ff6b6b;
+            box-shadow: 0 0 20px rgba(255, 107, 107, 0.3);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #ff6b6b 0%, #ff8e53 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 107, 107, 0.6);
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #ccc;
+            font-size: 14px;
+        }
+
+        .footer a {
+            color: #ff6b6b;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .footer a:hover {
+            color: #ff8e53;
+        }
+
+        .template-info {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #ff6b6b;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 12px;
+            border: 1px solid rgba(255, 107, 107, 0.3);
+        }
+
+        .neon-glow {
+            animation: neonGlow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes neonGlow {
+            from {
+                text-shadow: 0 0 20px rgba(255, 107, 107, 0.5);
+            }
+            to {
+                text-shadow: 0 0 30px rgba(255, 107, 107, 0.8), 0 0 40px rgba(255, 107, 107, 0.6);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="background-pattern"></div>
+    
+    <div class="template-info">
+        Template 2 - Dark Neon
+    </div>
+
+    <div class="login-container">
+        <div class="logo">
+            <h1 class="neon-glow">PIX MIKRO</h1>
+            <p>Sistema Futurista de Portal</p>
+        </div>
+
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email">E-mail:</label>
+                <input type="email" id="email" name="email" required placeholder="Digite seu e-mail">
+            </div>
+
+            <div class="form-group">
+                <label for="password">Senha:</label>
+                <input type="password" id="password" name="password" required placeholder="Digite sua senha">
+            </div>
+
+            <button type="submit" class="login-btn">
+                ACESSAR SISTEMA
+            </button>
+        </form>
+
+        <div class="footer">
+            <p>Primeira vez? <a href="#" onclick="alert('Funcionalidade em desenvolvimento')">Criar conta</a></p>
+            <p style="margin-top: 10px;">© 2025 PIX Mikro CRM - Dark Edition</p>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (email && password) {
+                // Adicionar efeito visual
+                const btn = document.querySelector('.login-btn');
+                btn.style.background = 'linear-gradient(135deg, #4ecdc4 0%, #45b7d1 100%)';
+                btn.textContent = 'CONECTANDO...';
+                
+                setTimeout(() => {
+                    alert('Login realizado com sucesso!\nTemplate: 2 (Dark Neon)\nE-mail: ' + email);
+                    btn.style.background = 'linear-gradient(135deg, #ff6b6b 0%, #ff8e53 100%)';
+                    btn.textContent = 'ACESSAR SISTEMA';
+                }, 1500);
+            } else {
+                alert('Por favor, preencha todos os campos!');
+            }
+        });
+
+        // Efeito de partículas
+        function createParticle() {
+            const particle = document.createElement('div');
+            particle.style.position = 'fixed';
+            particle.style.width = '2px';
+            particle.style.height = '2px';
+            particle.style.background = '#ff6b6b';
+            particle.style.borderRadius = '50%';
+            particle.style.pointerEvents = 'none';
+            particle.style.left = Math.random() * window.innerWidth + 'px';
+            particle.style.top = window.innerHeight + 'px';
+            particle.style.opacity = '0.7';
+            particle.style.zIndex = '-1';
+            
+            document.body.appendChild(particle);
+            
+            const animation = particle.animate([
+                { transform: 'translateY(0px)', opacity: 0.7 },
+                { transform: `translateY(-${window.innerHeight + 100}px)`, opacity: 0 }
+            ], {
+                duration: 3000 + Math.random() * 2000,
+                easing: 'linear'
+            });
+            
+            animation.onfinish = () => particle.remove();
+        }
+
+        // Criar partículas periodicamente
+        setInterval(createParticle, 200);
+    </script>
+</body>
+</html> 
