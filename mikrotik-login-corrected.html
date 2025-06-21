@@ -216,12 +216,27 @@
         function getApiConfig() {
             const params = new URLSearchParams(window.location.search);
             
+            // Get base API URL and clean it
+            const baseApiUrl = (params.get('api_url') || 'https://api.lucro.top')
+                .replace(/\/api\/captive-check.*$/, '')
+                .replace(/\/$/, '');
+            
+            // Determine template server URL
+            let templateBaseUrl;
+            if (baseApiUrl.includes('localhost') || baseApiUrl.includes('127.0.0.1')) {
+                // Local development - use the local server
+                templateBaseUrl = baseApiUrl;
+            } else {
+                // Production - use external API server for templates too
+                templateBaseUrl = baseApiUrl;
+            }
+            
             return {
                 // ✅ CORRIGIDO: URL da API base sem paths para evitar duplicação
-                apiUrl: (params.get('api_url') || 'https://api.lucro.top').replace(/\/api\/captive-check.*$/, '').replace(/\/$/, ''),
+                apiUrl: baseApiUrl,
                 mikrotikId: params.get('mikrotik_id') || '78957cd3-7096-4acd-970b-0aa0a768c555',
-                // ✅ CORRIGIDO: Template URL deve apontar para o servidor local
-                templateBaseUrl: window.location.origin // Sempre usar o servidor local para templates
+                // ✅ CORRIGIDO: Template URL deve apontar para o servidor da API
+                templateBaseUrl: templateBaseUrl
             };
         }
 

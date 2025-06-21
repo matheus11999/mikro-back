@@ -343,7 +343,29 @@ app.post('/api/captive-check/status', async (req, res, next) => {
         .order('pagamento_gerado_em', { ascending: false })
         .limit(1)
     );
-    const vendaPendente = vendaPendenteArr && vendaPendenteArr[0];
+    let vendaPendente = vendaPendenteArr && vendaPendenteArr[0];
+    
+    // Verifica se a venda pendente está expirada (mais de 10 minutos)
+    if (vendaPendente && vendaPendente.pagamento_gerado_em) {
+      const geradoEm = new Date(vendaPendente.pagamento_gerado_em);
+      const agora = new Date();
+      const diffMinutos = (agora - geradoEm) / 60000;
+      
+      if (diffMinutos > 10) {
+        console.log('[STATUS] Pagamento expirado, deletando:', vendaPendente.id);
+        
+        // Deleta a venda expirada
+        await handleSupabaseOperation(() =>
+          supabaseAdmin
+            .from('vendas')
+            .delete()
+            .eq('id', vendaPendente.id)
+        );
+        
+        // Limpa a referência
+        vendaPendente = null;
+      }
+    }
     // Estatísticas do MAC
     const totalVendas = vendasAprovadas ? vendasAprovadas.length : 0;
     const totalGasto = vendasAprovadas ? vendasAprovadas.reduce((acc, v) => acc + Number(v.preco || 0), 0) : 0;
