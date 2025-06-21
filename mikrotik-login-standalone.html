@@ -1081,7 +1081,10 @@
                     clearInterval(state.trialInterval);
                 }
                 
+                // Show countdown and activate trial after 10 seconds
                 let countdown = 10;
+                document.getElementById('trialCountdown').textContent = countdown;
+                
                 state.trialInterval = setInterval(() => {
                     countdown--;
                     document.getElementById('trialCountdown').textContent = countdown;
@@ -1089,6 +1092,7 @@
                     if (countdown <= 0) {
                         clearInterval(state.trialInterval);
                         state.trialInterval = null;
+                        console.log('10 segundos passaram - ativando trial...');
                         activateTrial();
                     }
                 }, 1000);
@@ -1167,7 +1171,7 @@
             }
         }
 
-        // Trial activation
+        // Trial activation - Usando a mesma lógica do MikroTik original
         async function activateTrial() {
             if (state.trialActivated) {
                 console.log('Trial já foi ativado anteriormente');
@@ -1187,18 +1191,13 @@
                     return;
                 }
                 
-                // Generate trial username based on MAC address
-                const trialUsername = 'T-' + state.mac.replace(/:/g, '-');
-                console.log('Trial Username:', trialUsername);
+                // Get login URL from form action (como no MikroTik original)
+                const form = document.getElementById('loginForm');
+                let loginUrl = form ? form.action : null;
                 
-                // Get login URL
-                let loginUrl = state.linkLogin;
-                
-                // If no link, try form action
+                // Se não conseguiu pegar do form, tenta usar state.linkLogin
                 if (!loginUrl || loginUrl.includes('$(')) {
-                    const form = document.getElementById('loginForm');
-                    loginUrl = form ? form.action : null;
-                    console.log('Usando action do form:', loginUrl);
+                    loginUrl = state.linkLogin;
                 }
                 
                 // Still no valid URL?
@@ -1210,36 +1209,39 @@
                     return;
                 }
                 
-                // Build trial URL
+                // Build trial URL exatamente como no MikroTik original:
+                // $(link-login-only)?dst=$(link-orig-esc)&username=T-$(mac-esc)
                 let trialUrl = loginUrl;
                 
-                // Add parameters
-                const params = new URLSearchParams();
-                params.append('username', trialUsername);
+                // Adiciona parâmetros como no exemplo original
+                const params = [];
                 
-                // Add destination if available
+                // Adiciona dst se disponível
                 if (state.linkOrig && !state.linkOrig.includes('$(')) {
-                    params.append('dst', state.linkOrig);
+                    params.push('dst=' + encodeURIComponent(state.linkOrig));
                 }
                 
-                // Append parameters to URL
-                const separator = trialUrl.includes('?') ? '&' : '?';
-                trialUrl = trialUrl + separator + params.toString();
+                // Adiciona username com T- prefix (como no original: T-$(mac-esc))
+                const trialUsername = 'T-' + state.mac.replace(/:/g, '');
+                params.push('username=' + encodeURIComponent(trialUsername));
                 
+                // Constrói URL final
+                const separator = trialUrl.includes('?') ? '&' : '?';
+                trialUrl = trialUrl + separator + params.join('&');
+                
+                console.log('Trial Username:', trialUsername);
                 console.log('URL do Trial:', trialUrl);
                 
                 // Update notice
                 document.getElementById('trialNotice').innerHTML = 
-                    '✅ Trial de 5 minutos ativado! Redirecionando em 2 segundos...';
+                    '✅ Trial de 5 minutos ativado! Redirecionando...';
                 
                 // Mark as activated
                 state.trialActivated = true;
                 
-                // Redirect after delay
-                setTimeout(() => {
-                    console.log('Redirecionando para:', trialUrl);
-                    window.location.href = trialUrl;
-                }, 2000);
+                // Redirect imediatamente (como no original)
+                console.log('Redirecionando para:', trialUrl);
+                window.location.href = trialUrl;
                 
             } catch (error) {
                 console.error('Erro ao ativar trial:', error);
