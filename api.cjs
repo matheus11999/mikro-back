@@ -747,6 +747,7 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
       transaction_amount: precoNumerico,
       description: descricao || plano.nome,
       payment_method_id: 'pix',
+      notification_url: 'https://api.lucro.top/api/webhook/mercadopago', // WEBHOOK URL AQUI!
       payer: payer || {
         email: 'comprador@email.com',
         first_name: 'Joao',
@@ -1250,16 +1251,22 @@ app.post('/api/webhook/mercadopago', async (req, res, next) => {
     res.status(200).send('OK');
     
     // Processa a notificação de forma assíncrona
+    // Mercado Pago pode enviar em diferentes formatos
     const { id, topic, type, action, data } = req.body;
     
+    // Também verifica query params (Mercado Pago às vezes envia assim)
+    const queryId = req.query.id || req.query['data.id'];
+    const queryTopic = req.query.topic;
+    
+    // Determina o payment ID e topic
+    const paymentTopic = topic || type || queryTopic;
+    const paymentId = id || data?.id || queryId;
+    
+    console.log('[WEBHOOK MP] Processando:', { paymentTopic, paymentId });
+    
     // Verifica se é uma notificação de pagamento
-    if (topic === 'payment' || type === 'payment') {
-      const paymentId = id || data?.id;
-      
-      if (!paymentId) {
-        console.error('[WEBHOOK MP] ID do pagamento não encontrado na notificação');
-        return;
-      }
+    if ((paymentTopic === 'payment' || paymentTopic === 'merchant_order') && paymentId) {
+
       
       console.log(`[WEBHOOK MP] Processando pagamento ${paymentId}...`);
       
@@ -1412,31 +1419,71 @@ app.post('/api/webhook/mercadopago', async (req, res, next) => {
                 
                 console.log('[WEBHOOK MP] Dados enviados para Mikrotik via webhook');
               }
-            } catch (webhookError) {
-              // Ignora erro de webhook do mikrotik
-              console.log('[WEBHOOK MP] Mikrotik sem webhook configurado ou erro ao enviar');
-            }
+                      } catch (webhookError) {
+            // Ignora erro de webhook do mikrotik
+            console.log('[WEBHOOK MP] Mikrotik sem webhook configurado ou erro ao enviar');
           }
-          
-        } catch (error) {
-          console.error('[WEBHOOK MP] Erro ao processar pagamento:', error);
+        } else {
+          console.log(`[WEBHOOK MP] Pagamento ${paymentId} com status: ${mpData.status}`);
         }
-      }, 2000); // Aguarda 2 segundos antes de processar
-    }
-    
-  } catch (error) {
-    console.error('[WEBHOOK MP] Erro no webhook:', error);
-    // Mesmo com erro, retorna 200 para o MP não reenviar
-    if (!res.headersSent) {
-      res.status(200).send('OK');
-    }
+        
+      } catch (error) {
+        console.error('[WEBHOOK MP] Erro ao processar pagamento:', error);
+      }
+    }, 2000); // Aguarda 2 segundos antes de processar
+  } else {
+    console.log('[WEBHOOK MP] Notificação ignorada:', { topic: paymentTopic, id: paymentId });
   }
+  
+} catch (error) {
+  console.error('[WEBHOOK MP] Erro no webhook:', error);
+  // Mesmo com erro, retorna 200 para o MP não reenviar
+  if (!res.headersSent) {
+    res.status(200).send('OK');
+  }
+}
 });
 
 // Endpoint GET para o webhook (alguns sistemas fazem verificação GET primeiro)
 app.get('/api/webhook/mercadopago', (req, res) => {
-  console.log('[WEBHOOK MP] Verificação GET recebida');
+  console.log('[WEBHOOK MP] Verificação GET recebida:', req.query);
   res.status(200).send('Webhook do Mercado Pago está ativo');
+});
+
+// Endpoint de teste para simular notificação do Mercado Pago
+app.post('/api/webhook/mercadopago/test', async (req, res) => {
+  const { payment_id } = req.body;
+  
+  if (!payment_id) {
+    return res.status(400).json({ error: 'payment_id é obrigatório' });
+  }
+  
+  console.log('[WEBHOOK TEST] Simulando notificação para payment_id:', payment_id);
+  
+  // Simula notificação do Mercado Pago
+  const simulatedNotification = {
+    id: payment_id,
+    topic: 'payment',
+    action: 'payment.updated',
+    date_created: new Date().toISOString()
+  };
+  
+  // Envia para o webhook real
+  try {
+    const response = await fetch('http://localhost:3000/api/webhook/mercadopago', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(simulatedNotification)
+    });
+    
+    res.json({
+      message: 'Notificação simulada enviada',
+      notification: simulatedNotification,
+      webhookResponse: response.status
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao simular notificação', details: error.message });
+  }
 });
 
 // Endpoint para listar MACs que compraram senhas nos últimos 10 minutos por Mikrotik

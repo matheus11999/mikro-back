@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Webhook - Mercado Pago</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .info-box {
+            background: #e3f2fd;
+            border: 1px solid #2196f3;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .success-box {
+            background: #e8f5e9;
+            border: 1px solid #4caf50;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .error-box {
+            background: #ffebee;
+            border: 1px solid #f44336;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        input, button {
+            padding: 10px;
+            margin: 5px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        input {
+            width: 300px;
+        }
+        button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            cursor: pointer;
+            padding: 10px 20px;
+        }
+        button:hover {
+            background: #1976d2;
+        }
+        .log {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 3px;
+            color: white;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .status.active {
+            background: #4caf50;
+        }
+        .status.inactive {
+            background: #f44336;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Teste de Webhook - Mercado Pago</h1>
+        
+        <div class="info-box">
+            <h3>ℹ️ Informações do Webhook</h3>
+            <p><strong>URL do Webhook:</strong> https://api.lucro.top/api/webhook/mercadopago</p>
+            <p><strong>Status:</strong> <span id="status" class="status inactive">Verificando...</span></p>
+        </div>
+
+        <div class="section">
+            <h3>📋 Instruções</h3>
+            <ol>
+                <li>O webhook já está configurado para receber notificações em cada pagamento criado</li>
+                <li>Quando um pagamento PIX é aprovado, o webhook processa automaticamente</li>
+                <li>Use o campo abaixo para testar com um payment_id existente</li>
+            </ol>
+        </div>
+
+        <div class="section">
+            <h3>🧪 Teste Manual</h3>
+            <p>Digite um payment_id para simular uma notificação:</p>
+            <input type="text" id="paymentId" placeholder="Ex: 115433681937" />
+            <button onclick="testWebhook()">Testar Webhook</button>
+        </div>
+
+        <div id="result"></div>
+
+        <div class="section">
+            <h3>📝 Log de Atividades</h3>
+            <div id="log" class="log">Aguardando ações...</div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'https://api.lucro.top';
+        
+        // Verifica status do webhook
+        async function checkWebhookStatus() {
+            try {
+                const response = await fetch(`${API_URL}/api/webhook/mercadopago`);
+                const text = await response.text();
+                
+                if (response.ok) {
+                    document.getElementById('status').textContent = 'Ativo';
+                    document.getElementById('status').className = 'status active';
+                    addLog('✅ Webhook está ativo e respondendo');
+                } else {
+                    document.getElementById('status').textContent = 'Inativo';
+                    document.getElementById('status').className = 'status inactive';
+                    addLog('❌ Webhook não está respondendo');
+                }
+            } catch (error) {
+                document.getElementById('status').textContent = 'Erro';
+                document.getElementById('status').className = 'status inactive';
+                addLog('❌ Erro ao verificar webhook: ' + error.message);
+            }
+        }
+        
+        // Testa webhook
+        async function testWebhook() {
+            const paymentId = document.getElementById('paymentId').value.trim();
+            
+            if (!paymentId) {
+                showResult('error', 'Por favor, digite um payment_id');
+                return;
+            }
+            
+            addLog(`🔄 Enviando notificação de teste para payment_id: ${paymentId}`);
+            
+            try {
+                const response = await fetch(`${API_URL}/api/webhook/mercadopago/test`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ payment_id: paymentId })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('success', `
+                        <h4>✅ Notificação Enviada!</h4>
+                        <p>O webhook foi acionado com sucesso.</p>
+                        <p><strong>Payment ID:</strong> ${paymentId}</p>
+                        <p><strong>Resposta do Webhook:</strong> ${data.webhookResponse}</p>
+                        <p>Verifique os logs do servidor para ver o processamento.</p>
+                    `);
+                    addLog(`✅ Notificação enviada com sucesso para ${paymentId}`);
+                } else {
+                    showResult('error', `Erro: ${data.error}`);
+                    addLog(`❌ Erro ao enviar notificação: ${data.error}`);
+                }
+            } catch (error) {
+                showResult('error', `Erro de conexão: ${error.message}`);
+                addLog(`❌ Erro de conexão: ${error.message}`);
+            }
+        }
+        
+        // Mostra resultado
+        function showResult(type, message) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `<div class="${type}-box">${message}</div>`;
+        }
+        
+        // Adiciona log
+        function addLog(message) {
+            const logDiv = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            logDiv.innerHTML = `[${time}] ${message}<br>` + logDiv.innerHTML;
+        }
+        
+        // Verifica status ao carregar
+        window.onload = () => {
+            checkWebhookStatus();
+            
+            // Enter key no input
+            document.getElementById('paymentId').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') testWebhook();
+            });
+        };
+    </script>
+</body>
+</html> 
