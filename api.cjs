@@ -883,14 +883,12 @@ app.get('/api/recent-sales/:mikrotik_id', async (req, res, next) => {
       return res.send('');
     }
 
-    // Formatar dados no formato solicitado: user-senha-mac-minutos
+    // Formatar dados no formato simplificado: mac-minutos (sem usuário/senha)
     const vendasFormatadas = vendasDesconectadas.map(venda => {
-      const usuario = venda.senha_id?.usuario || 'N/A';
-      const senha = venda.senha_id?.senha || 'N/A';
       const mac = venda.mac_id?.mac_address || 'N/A';
       const minutos = venda.plano_id?.duracao || 60;
       
-      return `${usuario}-${senha}-${mac}-${minutos}`;
+      return `${mac}-${minutos}`;
     });
 
     console.log(`[RECENT-SALES] Encontradas ${vendas.length} vendas totais, ${vendasDesconectadas.length} de MACs desconectados`);
