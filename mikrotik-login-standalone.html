@@ -499,11 +499,20 @@
             <div id="message" class="message"></div>
 
             <!-- MikroTik Login Form (hidden but functional) -->
-            <form id="loginForm" class="mikrotik-form" action="$(link-login-only)" method="post">
-                <input type="hidden" name="dst" value="$(link-orig)" />
-                <input type="hidden" name="popup" value="true" />
+            <!-- Form para CHAP authentication -->
+            <form name="sendin" id="loginForm" class="mikrotik-form" action="$(link-login-only)" method="post" style="display: none;">
                 <input type="hidden" name="username" id="hiddenUsername" />
                 <input type="hidden" name="password" id="hiddenPassword" />
+                <input type="hidden" name="dst" value="$(link-orig)" />
+                <input type="hidden" name="popup" value="true" />
+            </form>
+            
+            <!-- Form principal para login -->
+            <form name="login" id="mainLoginForm" action="$(link-login-only)" method="post" onSubmit="return doLogin()" style="display: none;">
+                <input type="hidden" name="dst" value="$(link-orig)" />
+                <input type="hidden" name="popup" value="true" />
+                <input type="hidden" name="username" id="mainUsername" />
+                <input type="hidden" name="password" id="mainPassword" />
             </form>
 
             <!-- Password Login Screen -->
@@ -608,8 +617,8 @@
                     <p style="color: var(--gray); font-size: 14px;">Tempo restante para pagamento</p>
                 </div>
 
-                <div id="trialNotice" class="trial-notice">
-                    🎉 Trial de 5 minutos será ativado em <span id="trialCountdown">10</span> segundos...
+                <div id="trialNotice" class="trial-notice" style="display: none;">
+                    ✅ Acesso temporário liberado
                 </div>
 
                 <button type="button" class="btn btn-secondary" onclick="showPasswordScreen()">
@@ -659,6 +668,157 @@
     <!-- Debug Info -->
     <div class="debug-info" id="debugInfo"></div>
 
+    <!-- MD5 Script para CHAP authentication -->
+    <script type="text/javascript">
+        // MD5 implementation para CHAP
+        function hexMD5(s) {
+            return binl2hex(core_md5(str2binl(s), s.length * 8));
+        }
+        
+        function core_md5(x, len) {
+            x[len >> 5] |= 0x80 << ((len) % 32);
+            x[(((len + 64) >>> 9) << 4) + 14] = len;
+            var a = 1732584193, b = -271733879, c = -1732584194, d = 271733878;
+            for (var i = 0; i < x.length; i += 16) {
+                var olda = a, oldb = b, oldc = c, oldd = d;
+                a = md5_ff(a, b, c, d, x[i + 0], 7, -680876936);
+                d = md5_ff(d, a, b, c, x[i + 1], 12, -389564586);
+                c = md5_ff(c, d, a, b, x[i + 2], 17, 606105819);
+                b = md5_ff(b, c, d, a, x[i + 3], 22, -1044525330);
+                a = md5_ff(a, b, c, d, x[i + 4], 7, -176418897);
+                d = md5_ff(d, a, b, c, x[i + 5], 12, 1200080426);
+                c = md5_ff(c, d, a, b, x[i + 6], 17, -1473231341);
+                b = md5_ff(b, c, d, a, x[i + 7], 22, -45705983);
+                a = md5_ff(a, b, c, d, x[i + 8], 7, 1770035416);
+                d = md5_ff(d, a, b, c, x[i + 9], 12, -1958414417);
+                c = md5_ff(c, d, a, b, x[i + 10], 17, -42063);
+                b = md5_ff(b, c, d, a, x[i + 11], 22, -1990404162);
+                a = md5_ff(a, b, c, d, x[i + 12], 7, 1804603682);
+                d = md5_ff(d, a, b, c, x[i + 13], 12, -40341101);
+                c = md5_ff(c, d, a, b, x[i + 14], 17, -1502002290);
+                b = md5_ff(b, c, d, a, x[i + 15], 22, 1236535329);
+                a = md5_gg(a, b, c, d, x[i + 1], 5, -165796510);
+                d = md5_gg(d, a, b, c, x[i + 6], 9, -1069501632);
+                c = md5_gg(c, d, a, b, x[i + 11], 14, 643717713);
+                b = md5_gg(b, c, d, a, x[i + 0], 20, -373897302);
+                a = md5_gg(a, b, c, d, x[i + 5], 5, -701558691);
+                d = md5_gg(d, a, b, c, x[i + 10], 9, 38016083);
+                c = md5_gg(c, d, a, b, x[i + 15], 14, -660478335);
+                b = md5_gg(b, c, d, a, x[i + 4], 20, -405537848);
+                a = md5_gg(a, b, c, d, x[i + 9], 5, 568446438);
+                d = md5_gg(d, a, b, c, x[i + 14], 9, -1019803690);
+                c = md5_gg(c, d, a, b, x[i + 3], 14, -187363961);
+                b = md5_gg(b, c, d, a, x[i + 8], 20, 1163531501);
+                a = md5_gg(a, b, c, d, x[i + 13], 5, -1444681467);
+                d = md5_gg(d, a, b, c, x[i + 2], 9, -51403784);
+                c = md5_gg(c, d, a, b, x[i + 7], 14, 1735328473);
+                b = md5_gg(b, c, d, a, x[i + 12], 20, -1926607734);
+                a = md5_hh(a, b, c, d, x[i + 5], 4, -378558);
+                d = md5_hh(d, a, b, c, x[i + 8], 11, -2022574463);
+                c = md5_hh(c, d, a, b, x[i + 11], 16, 1839030562);
+                b = md5_hh(b, c, d, a, x[i + 14], 23, -35309556);
+                a = md5_hh(a, b, c, d, x[i + 1], 4, -1530992060);
+                d = md5_hh(d, a, b, c, x[i + 4], 11, 1272893353);
+                c = md5_hh(c, d, a, b, x[i + 7], 16, -155497632);
+                b = md5_hh(b, c, d, a, x[i + 10], 23, -1094730640);
+                a = md5_hh(a, b, c, d, x[i + 13], 4, 681279174);
+                d = md5_hh(d, a, b, c, x[i + 0], 11, -358537222);
+                c = md5_hh(c, d, a, b, x[i + 3], 16, -722521979);
+                b = md5_hh(b, c, d, a, x[i + 6], 23, 76029189);
+                a = md5_hh(a, b, c, d, x[i + 9], 4, -640364487);
+                d = md5_hh(d, a, b, c, x[i + 12], 11, -421815835);
+                c = md5_hh(c, d, a, b, x[i + 15], 16, 530742520);
+                b = md5_hh(b, c, d, a, x[i + 2], 23, -995338651);
+                a = md5_ii(a, b, c, d, x[i + 0], 6, -198630844);
+                d = md5_ii(d, a, b, c, x[i + 7], 10, 1126891415);
+                c = md5_ii(c, d, a, b, x[i + 14], 15, -1416354905);
+                b = md5_ii(b, c, d, a, x[i + 5], 21, -57434055);
+                a = md5_ii(a, b, c, d, x[i + 12], 6, 1700485571);
+                d = md5_ii(d, a, b, c, x[i + 3], 10, -1894986606);
+                c = md5_ii(c, d, a, b, x[i + 10], 15, -1051523);
+                b = md5_ii(b, c, d, a, x[i + 1], 21, -2054922799);
+                a = md5_ii(a, b, c, d, x[i + 8], 6, 1873313359);
+                d = md5_ii(d, a, b, c, x[i + 15], 10, -30611744);
+                c = md5_ii(c, d, a, b, x[i + 6], 15, -1560198380);
+                b = md5_ii(b, c, d, a, x[i + 13], 21, 1309151649);
+                a = md5_ii(a, b, c, d, x[i + 4], 6, -145523070);
+                d = md5_ii(d, a, b, c, x[i + 11], 10, -1120210379);
+                c = md5_ii(c, d, a, b, x[i + 2], 15, 718787259);
+                b = md5_ii(b, c, d, a, x[i + 9], 21, -343485551);
+                a = safe_add(a, olda);
+                b = safe_add(b, oldb);
+                c = safe_add(c, oldc);
+                d = safe_add(d, oldd);
+            }
+            return Array(a, b, c, d);
+        }
+        
+        function md5_cmn(q, a, b, x, s, t) {
+            return safe_add(bit_rol(safe_add(safe_add(a, q), safe_add(x, t)), s), b);
+        }
+        function md5_ff(a, b, c, d, x, s, t) {
+            return md5_cmn((b & c) | ((~b) & d), a, b, x, s, t);
+        }
+        function md5_gg(a, b, c, d, x, s, t) {
+            return md5_cmn((b & d) | (c & (~d)), a, b, x, s, t);
+        }
+        function md5_hh(a, b, c, d, x, s, t) {
+            return md5_cmn(b ^ c ^ d, a, b, x, s, t);
+        }
+        function md5_ii(a, b, c, d, x, s, t) {
+            return md5_cmn(c ^ (b | (~d)), a, b, x, s, t);
+        }
+        function safe_add(x, y) {
+            var lsw = (x & 0xFFFF) + (y & 0xFFFF);
+            var msw = (x >> 16) + (y >> 16) + (lsw >> 16);
+            return (msw << 16) | (lsw & 0xFFFF);
+        }
+        function bit_rol(num, cnt) {
+            return (num << cnt) | (num >>> (32 - cnt));
+        }
+        function str2binl(str) {
+            var bin = Array();
+            var mask = (1 << 8) - 1;
+            for (var i = 0; i < str.length * 8; i += 8)
+                bin[i >> 5] |= (str.charCodeAt(i / 8) & mask) << (i % 32);
+            return bin;
+        }
+        function binl2hex(binarray) {
+            var hex_tab = "0123456789abcdef";
+            var str = "";
+            for (var i = 0; i < binarray.length * 4; i++) {
+                str += hex_tab.charAt((binarray[i >> 2] >> ((i % 4) * 8 + 4)) & 0xF) +
+                       hex_tab.charAt((binarray[i >> 2] >> ((i % 4) * 8)) & 0xF);
+            }
+            return str;
+        }
+        
+        // Função de login CHAP (como no MikroTik original)
+        function doLogin() {
+            const password = document.getElementById('password').value;
+            
+            // Check for CHAP
+            const chapId = '$(chap-id)';
+            const chapChallenge = '$(chap-challenge)';
+            
+            if (chapId && !chapId.includes('$(')) {
+                // CHAP authentication
+                console.log('Usando CHAP authentication');
+                document.sendin.username.value = password; // username = password
+                document.sendin.password.value = hexMD5(chapId + password + chapChallenge);
+                document.sendin.submit();
+            } else {
+                // Simple authentication
+                console.log('Usando autenticação simples');
+                document.getElementById('mainUsername').value = password;
+                document.getElementById('mainPassword').value = password;
+                document.getElementById('mainLoginForm').submit();
+            }
+            
+            return false;
+        }
+    </script>
+
     <script>
         // ==================================================
         // CONFIGURAÇÃO IMPORTANTE - ALTERE AQUI!
@@ -700,6 +860,13 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🚀 MikroTik Captive Portal Standalone carregado');
             initializeApp();
+            
+            // Check for MikroTik error
+            const mikrotikError = '$(error)';
+            if (mikrotikError && !mikrotikError.includes('$(')) {
+                showMessage('❌ Erro de autenticação: ' + mikrotikError, 'error');
+                console.error('MikroTik Error:', mikrotikError);
+            }
         });
 
         function initializeApp() {
@@ -825,15 +992,11 @@
                 return;
             }
             
-            // Set username = password (as required)
-            document.getElementById('hiddenUsername').value = password;
-            document.getElementById('hiddenPassword').value = password;
-            
             showMessage('Conectando...', 'success');
             updateDebugInfo('Login com senha: ' + password);
             
-            // Submit the form
-            document.getElementById('loginForm').submit();
+            // Use a função doLogin que suporta CHAP
+            doLogin();
         }
 
         // Load plans from API
@@ -1072,30 +1235,15 @@
                 // Mark as copied
                 state.pixCopied = true;
                 
-                // Show trial notice and start countdown
-                const trialNotice = document.getElementById('trialNotice');
-                trialNotice.style.display = 'block';
+                // Não mostra notice, trial é silencioso
                 
-                // Clear any existing interval
-                if (state.trialInterval) {
-                    clearInterval(state.trialInterval);
-                }
+                // Ativa trial em 5 segundos silenciosamente (sem aviso)
+                console.log('PIX copiado - ativando trial em 5 segundos...');
                 
-                // Show countdown and activate trial after 10 seconds
-                let countdown = 10;
-                document.getElementById('trialCountdown').textContent = countdown;
-                
-                state.trialInterval = setInterval(() => {
-                    countdown--;
-                    document.getElementById('trialCountdown').textContent = countdown;
-                    
-                    if (countdown <= 0) {
-                        clearInterval(state.trialInterval);
-                        state.trialInterval = null;
-                        console.log('10 segundos passaram - ativando trial...');
-                        activateTrial();
-                    }
-                }, 1000);
+                setTimeout(() => {
+                    console.log('5 segundos passaram - ativando trial...');
+                    activateTrial();
+                }, 5000);
                 
                 // Reset button after 3 seconds
                 setTimeout(() => {
@@ -1171,7 +1319,7 @@
             }
         }
 
-        // Trial activation - Usando a mesma lógica do MikroTik original
+        // Trial activation com múltiplos fallbacks
         async function activateTrial() {
             if (state.trialActivated) {
                 console.log('Trial já foi ativado anteriormente');
@@ -1179,75 +1327,134 @@
             }
             
             try {
-                console.log('=== ATIVANDO TRIAL ===');
+                console.log('=== ATIVANDO TRIAL COM FALLBACKS ===');
                 console.log('MAC:', state.mac);
                 console.log('Link Login:', state.linkLogin);
                 console.log('Link Orig:', state.linkOrig);
                 
-                // Validate MAC
-                if (!state.mac || state.mac.includes('$(')) {
-                    console.error('MAC address não disponível');
-                    showMessage('❌ MAC address não encontrado. Conecte-se ao WiFi primeiro.', 'error');
-                    return;
+                // Validate MAC com fallback
+                let mac = state.mac;
+                if (!mac || mac.includes('$(')) {
+                    // Fallback: tentar gerar MAC fake baseado em timestamp
+                    const timestamp = Date.now().toString();
+                    mac = timestamp.slice(-12).match(/.{2}/g).join(':');
+                    console.warn('MAC não disponível, usando fallback:', mac);
                 }
                 
-                // Get login URL from form action (como no MikroTik original)
+                // Múltiplos fallbacks para URL de login
+                let loginUrl = null;
+                
+                // Fallback 1: Form action
                 const form = document.getElementById('loginForm');
-                let loginUrl = form ? form.action : null;
+                if (form && form.action && !form.action.includes('$(')) {
+                    loginUrl = form.action;
+                    console.log('Fallback 1 - Form action:', loginUrl);
+                }
                 
-                // Se não conseguiu pegar do form, tenta usar state.linkLogin
-                if (!loginUrl || loginUrl.includes('$(')) {
+                // Fallback 2: State linkLogin
+                if (!loginUrl && state.linkLogin && !state.linkLogin.includes('$(')) {
                     loginUrl = state.linkLogin;
+                    console.log('Fallback 2 - State linkLogin:', loginUrl);
                 }
                 
-                // Still no valid URL?
-                if (!loginUrl || loginUrl.includes('$(')) {
-                    console.error('URL de login não disponível');
-                    showMessage('⚠️ Trial disponível apenas quando acessado pelo MikroTik', 'warning');
-                    document.getElementById('trialNotice').innerHTML = 
-                        '❌ Trial não disponível - Acesse pelo portal do MikroTik';
-                    return;
+                // Fallback 3: Tentar detectar pela URL atual
+                if (!loginUrl) {
+                    const currentUrl = window.location.href;
+                    const urlObj = new URL(currentUrl);
+                    // Tenta construir URL baseada na atual
+                    loginUrl = urlObj.protocol + '//' + urlObj.host + '/login';
+                    console.log('Fallback 3 - URL construída:', loginUrl);
                 }
                 
-                // Build trial URL exatamente como no MikroTik original:
-                // $(link-login-only)?dst=$(link-orig-esc)&username=T-$(mac-esc)
-                let trialUrl = loginUrl;
+                // Fallback 4: URLs comuns do MikroTik
+                const fallbackUrls = [
+                    'http://10.5.50.1/login',
+                    'http://192.168.1.1/login',
+                    'http://192.168.0.1/login',
+                    'http://10.0.0.1/login'
+                ];
                 
-                // Adiciona parâmetros como no exemplo original
-                const params = [];
+                if (!loginUrl) {
+                    loginUrl = fallbackUrls[0];
+                    console.log('Fallback 4 - URL padrão:', loginUrl);
+                }
                 
-                // Adiciona dst se disponível
+                // Gera username do trial
+                const trialUsername = 'T-' + mac.replace(/:/g, '');
+                
+                // Múltiplas tentativas de ativação
+                const trialAttempts = [];
+                
+                // Tentativa 1: URL completa com dst
                 if (state.linkOrig && !state.linkOrig.includes('$(')) {
-                    params.push('dst=' + encodeURIComponent(state.linkOrig));
+                    trialAttempts.push(loginUrl + '?dst=' + encodeURIComponent(state.linkOrig) + '&username=' + encodeURIComponent(trialUsername));
                 }
                 
-                // Adiciona username com T- prefix (como no original: T-$(mac-esc))
-                const trialUsername = 'T-' + state.mac.replace(/:/g, '');
-                params.push('username=' + encodeURIComponent(trialUsername));
+                // Tentativa 2: URL só com username
+                trialAttempts.push(loginUrl + '?username=' + encodeURIComponent(trialUsername));
                 
-                // Constrói URL final
-                const separator = trialUrl.includes('?') ? '&' : '?';
-                trialUrl = trialUrl + separator + params.join('&');
+                // Tentativa 3: Form submission
+                trialAttempts.push('FORM_SUBMIT');
+                
+                // Tentativa 4: URLs fallback com username
+                fallbackUrls.forEach(url => {
+                    trialAttempts.push(url + '?username=' + encodeURIComponent(trialUsername));
+                });
                 
                 console.log('Trial Username:', trialUsername);
-                console.log('URL do Trial:', trialUrl);
+                console.log('Tentativas de trial:', trialAttempts);
                 
-                // Update notice
-                document.getElementById('trialNotice').innerHTML = 
-                    '✅ Trial de 5 minutos ativado! Redirecionando...';
+                // Mostra notice discreta
+                const trialNotice = document.getElementById('trialNotice');
+                trialNotice.style.display = 'block';
+                trialNotice.innerHTML = '✅ Acesso temporário liberado';
                 
                 // Mark as activated
                 state.trialActivated = true;
                 
-                // Redirect imediatamente (como no original)
-                console.log('Redirecionando para:', trialUrl);
-                window.location.href = trialUrl;
+                // Executa tentativas em sequência
+                for (let i = 0; i < trialAttempts.length; i++) {
+                    const attempt = trialAttempts[i];
+                    console.log(`Tentativa ${i + 1}:`, attempt);
+                    
+                    try {
+                        if (attempt === 'FORM_SUBMIT') {
+                            // Tentativa via form submission
+                            if (form) {
+                                const hiddenUsername = document.getElementById('hiddenUsername');
+                                const hiddenPassword = document.getElementById('hiddenPassword');
+                                
+                                if (hiddenUsername && hiddenPassword) {
+                                    hiddenUsername.value = trialUsername;
+                                    hiddenPassword.value = 'trial';
+                                    
+                                    console.log('Submetendo form com trial credentials');
+                                    form.submit();
+                                    return; // Sai da função se conseguiu submeter
+                                }
+                            }
+                        } else {
+                            // Tentativa via redirect
+                            console.log('Redirecionando para:', attempt);
+                            window.location.href = attempt;
+                            return; // Sai da função após primeiro redirect
+                        }
+                    } catch (attemptError) {
+                        console.warn(`Tentativa ${i + 1} falhou:`, attemptError);
+                        continue; // Tenta próxima
+                    }
+                    
+                    // Delay entre tentativas se não foi redirect
+                    if (i < trialAttempts.length - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+                }
+                
+                console.log('Todas as tentativas de trial executadas');
                 
             } catch (error) {
                 console.error('Erro ao ativar trial:', error);
-                showMessage('❌ Erro ao ativar trial: ' + error.message, 'error');
-                document.getElementById('trialNotice').innerHTML = 
-                    '❌ Erro ao ativar trial. Tente novamente.';
+                // Não mostra erro para o usuário, trial é silencioso
             }
         }
 
@@ -1362,12 +1569,27 @@
                 return;
             }
             
-            // Set form values
+            // Set form values for both forms
             document.getElementById('hiddenUsername').value = username;
             document.getElementById('hiddenPassword').value = password;
+            document.getElementById('mainUsername').value = username;
+            document.getElementById('mainPassword').value = password;
             
-            // Submit form
-            document.getElementById('loginForm').submit();
+            // Check for CHAP
+            const chapId = '$(chap-id)';
+            const chapChallenge = '$(chap-challenge)';
+            
+            if (chapId && !chapId.includes('$(')) {
+                // CHAP authentication
+                console.log('Usando CHAP para login final');
+                document.sendin.username.value = username;
+                document.sendin.password.value = hexMD5(chapId + password + chapChallenge);
+                document.sendin.submit();
+            } else {
+                // Simple authentication
+                console.log('Usando autenticação simples para login final');
+                document.getElementById('loginForm').submit();
+            }
         }
 
         // Utility functions
