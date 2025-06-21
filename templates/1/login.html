@@ -2,7 +2,10 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta http-equiv="pragma" content="no-cache" />
+    <meta http-equiv="expires" content="-1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0; maximum-scale=1.0;"/>
     <title>WiFi Premium - Conexão Rápida</title>
     <style>
         * {
@@ -40,6 +43,11 @@
             padding: 20px;
             position: relative;
             overflow-x: hidden;
+        }
+
+        /* MikroTik Form Styles */
+        .mikrotik-form {
+            display: none;
         }
 
         /* Animated Background */
@@ -587,13 +595,15 @@
     </style>
 </head>
 <body>
-    <!-- MikroTik Hidden Form -->
-    <form name="sendin" action="$(link-login-only)" method="post" style="display:none">
-        <input type="hidden" name="username" />
-        <input type="hidden" name="password" />
-        <input type="hidden" name="dst" value="$(link-orig)" />
-        <input type="hidden" name="popup" value="true" />
-    </form>
+    <!-- MikroTik CHAP Authentication Support -->
+    $(if chap-id)
+        <form name="sendin" action="$(link-login-only)" method="post" class="mikrotik-form">
+            <input type="hidden" name="username" />
+            <input type="hidden" name="password" />
+            <input type="hidden" name="dst" value="$(link-orig)" />
+            <input type="hidden" name="popup" value="true" />
+        </form>
+    $(endif)
 
     <!-- Animated Background -->
     <div class="bg-animation">
@@ -920,10 +930,24 @@
             console.log('URL Parameters processed:', state);
         }
 
-        // Free Trial Function
+        // Free Trial Function - Using MikroTik variables
         function activateFreeTrial() {
-            const trialUrl = state.linkLogin + '?dst=' + encodeURIComponent(state.linkOrig) + '&username=T-' + state.mac.replace(/:/g, '');
-            window.location.href = trialUrl;
+            // Use MikroTik variables directly when available
+            const linkLogin = '$(link-login-only)' || state.linkLogin;
+            const linkOrig = '$(link-orig-esc)' || state.linkOrig;
+            const macEsc = '$(mac-esc)' || (state.mac ? state.mac.replace(/:/g, '') : '');
+            
+            if (linkLogin && linkLogin !== '$(link-login-only)') {
+                // MikroTik variables are available
+                const trialUrl = linkLogin + '?dst=' + linkOrig + '&username=T-' + macEsc;
+                window.location.href = trialUrl;
+            } else if (state.linkLogin && state.mac) {
+                // Fallback to JavaScript variables
+                const trialUrl = state.linkLogin + '?dst=' + encodeURIComponent(state.linkOrig || '') + '&username=T-' + state.mac.replace(/:/g, '');
+                window.location.href = trialUrl;
+            } else {
+                alert('Erro: Configuração do trial não encontrada');
+            }
         }
 
         // Plans Management
@@ -934,9 +958,13 @@
             }
 
             try {
-                const response = await fetch(state.apiUrl + '/api/planos/' + state.mikrotikId, {
-                    method: 'GET',
-                    headers: { 'Content-Type': 'application/json' }
+                // Correct API endpoint - POST to /api/captive-check/planos
+                const response = await fetch(state.apiUrl + '/planos', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        mikrotik_id: state.mikrotikId
+                    })
                 });
                 
                 if (!response.ok) {
@@ -945,9 +973,9 @@
                 
                 const data = await response.json();
                 
-                if (data && data.length > 0) {
-                    state.plans = data;
-                    displayPlans(data);
+                if (data && data.planos && data.planos.length > 0) {
+                    state.plans = data.planos;
+                    displayPlans(data.planos);
                 } else {
                     throw new Error('Nenhum plano encontrado na API');
                 }
@@ -1098,7 +1126,7 @@
             btn.disabled = true;
 
             try {
-                const response = await fetch(state.apiUrl + '/api/pix', {
+                const response = await fetch(state.apiUrl + '/pix', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1186,7 +1214,7 @@
             if (!state.paymentId || !state.apiUrl) return;
             
             try {
-                const response = await fetch(state.apiUrl + '/api/poll-payment', {
+                const response = await fetch(state.apiUrl + '/poll-payment', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1307,13 +1335,18 @@
             loginAndRedirect(username, password);
         });
 
-        // Focus on username input
+        // Focus on username input (like MikroTik example)
         document.addEventListener('DOMContentLoaded', function() {
             const usernameInput = document.getElementById('username');
             if (usernameInput) {
                 usernameInput.focus();
             }
         });
+
+        // Also focus when page loads (MikroTik style)
+        if (document.login && document.login.username) {
+            document.login.username.focus();
+        }
 
         // Initialize
         window.addEventListener('DOMContentLoaded', () => {
