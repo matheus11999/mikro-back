@@ -892,17 +892,28 @@
         function getUrlParams() {
             const urlParams = new URLSearchParams(window.location.search);
             
-            // Get MikroTik data from URL or fallback to MikroTik variables
-            state.mac = urlParams.get('mac') || 'AA:BB:CC:DD:EE:FF';
-            state.ip = urlParams.get('ip') || '192.168.1.100';
-            state.interface = urlParams.get('interface') || 'wlan1';
-            state.linkOrig = urlParams.get('link-orig') || '';
-            state.linkLogin = urlParams.get('link-login') || 'http://10.5.50.1/login';
+            // Get MikroTik data from URL parameters - REQUIRED
+            state.mac = urlParams.get('mac');
+            state.ip = urlParams.get('ip');
+            state.interface = urlParams.get('interface');
+            state.linkOrig = urlParams.get('link-orig');
+            state.linkLogin = urlParams.get('link-login');
             
-            // Get configuration data
-            state.mikrotikId = urlParams.get('mikrotik_id') || '78957cd3-7096-4acd-970b-0aa0a768c555';
-            state.apiUrl = urlParams.get('api_url') || 'https://api.lucro.top';
+            // Get configuration data - REQUIRED
+            state.mikrotikId = urlParams.get('mikrotik_id');
+            state.apiUrl = urlParams.get('api_url');
             state.debug = urlParams.get('debug') === 'true';
+
+            // Validate required parameters
+            if (!state.mac || !state.mikrotikId || !state.apiUrl) {
+                console.error('Parâmetros obrigatórios não fornecidos:', {
+                    mac: state.mac,
+                    mikrotikId: state.mikrotikId,
+                    apiUrl: state.apiUrl
+                });
+                alert('Erro: Parâmetros de configuração não encontrados. Contate o administrador.');
+                return;
+            }
 
             updateDebugInfo();
             
@@ -917,11 +928,20 @@
 
         // Plans Management
         async function loadPlans() {
+            if (!state.apiUrl || !state.mikrotikId) {
+                alert('Erro: Configuração da API não encontrada');
+                return;
+            }
+
             try {
                 const response = await fetch(state.apiUrl + '/api/planos/' + state.mikrotikId, {
                     method: 'GET',
                     headers: { 'Content-Type': 'application/json' }
                 });
+                
+                if (!response.ok) {
+                    throw new Error('Erro na resposta da API: ' + response.status);
+                }
                 
                 const data = await response.json();
                 
@@ -929,36 +949,17 @@
                     state.plans = data;
                     displayPlans(data);
                 } else {
-                    throw new Error('Nenhum plano encontrado');
+                    throw new Error('Nenhum plano encontrado na API');
                 }
             } catch (error) {
                 console.error('Error loading plans:', error);
-                // Fallback plans
-                const fallbackPlans = [
-                    {
-                        id: 1,
-                        nome: 'Plano 1 Hora',
-                        preco: 5.00,
-                        duracao: 60,
-                        features: ['1 hora de acesso', 'Velocidade 10Mbps', 'Navegação ilimitada']
-                    },
-                    {
-                        id: 2,
-                        nome: 'Plano 2 Horas',
-                        preco: 8.00,
-                        duracao: 120,
-                        features: ['2 horas de acesso', 'Velocidade 15Mbps', 'Navegação ilimitada']
-                    },
-                    {
-                        id: 3,
-                        nome: 'Plano Dia Todo',
-                        preco: 15.00,
-                        duracao: 1440,
-                        features: ['24 horas de acesso', 'Velocidade 20Mbps', 'Navegação ilimitada']
-                    }
-                ];
-                state.plans = fallbackPlans;
-                displayPlans(fallbackPlans);
+                alert('Erro ao carregar planos: ' + error.message + '. Contate o administrador.');
+                // Don't show fallback plans - require real API data
+                document.getElementById('plansContainer').innerHTML = 
+                    '<div style="text-align: center; padding: 20px; color: #666;">' +
+                    '<p>❌ Erro ao carregar planos</p>' +
+                    '<p>Verifique sua conexão e tente novamente</p>' +
+                    '</div>';
             }
         }
 
@@ -967,11 +968,17 @@
             
             let htmlContent = '';
             plans.forEach(function(plan) {
-                const features = plan.features || [formatDuration(plan.duracao) + ' de acesso', 'Velocidade alta', 'Navegação ilimitada'];
+                // Use only real data from API - no fallbacks
+                const features = plan.features || [];
                 let featuresHtml = '';
                 features.forEach(function(feature) {
                     featuresHtml += '<li>' + feature + '</li>';
                 });
+                
+                // If no features provided, show duration only
+                if (features.length === 0 && plan.duracao) {
+                    featuresHtml = '<li>' + formatDuration(plan.duracao) + ' de acesso</li>';
+                }
                 
                 htmlContent += 
                     '<div class="plan-card" onclick="selectPlan(' + plan.id + ')" data-plan-id="' + plan.id + '">' +
@@ -1017,8 +1024,14 @@
                 // Generate trial username
                 const trialUsername = 'T-' + state.mac.replace(/:/g, '');
                 
-                // Trial URL for MikroTik
-                let trialUrl = state.linkLogin || 'http://10.5.50.1/login';
+                // Trial URL for MikroTik - REQUIRED
+                if (!state.linkLogin) {
+                    console.error('Link de login não fornecido');
+                    alert('Erro: Configuração do MikroTik não encontrada');
+                    return;
+                }
+                
+                let trialUrl = state.linkLogin;
                 
                 if (trialUrl.includes('?')) {
                     trialUrl += '&username=' + encodeURIComponent(trialUsername) + '&password=trial';
@@ -1075,6 +1088,11 @@
         async function generatePix() {
             if (!state.selectedPlan) return;
             
+            if (!state.apiUrl || !state.mac || !state.mikrotikId) {
+                alert('Erro: Dados necessários não encontrados');
+                return;
+            }
+            
             const btn = document.getElementById('selectPlanBtn');
             btn.classList.add('loading');
             btn.disabled = true;
@@ -1092,6 +1110,10 @@
                     })
                 });
 
+                if (!response.ok) {
+                    throw new Error('Erro na API: ' + response.status);
+                }
+
                 const data = await response.json();
                 
                 if (data.chave_pix && data.qrcode) {
@@ -1099,12 +1121,12 @@
                     showPixPayment(data);
                     startPaymentCheck();
                 } else {
-                    throw new Error('Erro ao gerar PIX');
+                    throw new Error('Resposta inválida da API: ' + JSON.stringify(data));
                 }
                 
             } catch (error) {
                 console.error('Error generating PIX:', error);
-                alert('Erro ao gerar PIX. Tente novamente.');
+                alert('Erro ao gerar PIX: ' + error.message + '. Contate o administrador.');
             } finally {
                 btn.classList.remove('loading');
                 btn.disabled = false;
@@ -1161,7 +1183,7 @@
 
         // Payment Checking
         async function checkPayment() {
-            if (!state.paymentId) return;
+            if (!state.paymentId || !state.apiUrl) return;
             
             try {
                 const response = await fetch(state.apiUrl + '/api/poll-payment', {
@@ -1171,6 +1193,10 @@
                         payment_id: state.paymentId
                     })
                 });
+
+                if (!response.ok) {
+                    throw new Error('Erro na API: ' + response.status);
+                }
 
                 const data = await response.json();
                 
@@ -1184,6 +1210,7 @@
                 }
             } catch (error) {
                 console.error('Error checking payment:', error);
+                // Don't show alert for every check error, just log it
             }
         }
 
