@@ -1231,12 +1231,9 @@
             }
 
             try {
-                const response = await fetch(state.apiUrl + '/api/captive-check/planos', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        mikrotik_id: state.mikrotikId
-                    })
+                const response = await fetch(state.apiUrl + '/api/captive-check/planos/' + state.mikrotikId, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
                 });
                 
                 if (!response.ok) {

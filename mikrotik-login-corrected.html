@@ -217,8 +217,8 @@
             const params = new URLSearchParams(window.location.search);
             
             return {
-                // ✅ CORRIGIDO: URL da API sem o path /api/captive-check/
-                apiUrl: params.get('api_url') || 'https://api.lucro.top',
+                // ✅ CORRIGIDO: URL da API base sem paths para evitar duplicação
+                apiUrl: (params.get('api_url') || 'https://api.lucro.top').replace(/\/api\/captive-check.*$/, '').replace(/\/$/, ''),
                 mikrotikId: params.get('mikrotik_id') || '78957cd3-7096-4acd-970b-0aa0a768c555',
                 // ✅ CORRIGIDO: Template URL deve apontar para o servidor local
                 templateBaseUrl: window.location.origin // Sempre usar o servidor local para templates
@@ -243,7 +243,7 @@
                 }
             });
             
-            // ✅ CORRIGIDO: API configuration correta
+            // ✅ CORRIGIDO: API configuration sem trailing slash
             templateUrl.searchParams.set('api_url', apiConfig.apiUrl);
             templateUrl.searchParams.set('mikrotik_id', apiConfig.mikrotikId);
             
