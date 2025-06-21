@@ -1303,7 +1303,7 @@ app.post('/api/webhook/mercadopago/test', async (req, res) => {
   }
 });
 
-// Endpoint para listar MACs que compraram senhas nos últimos 10 minutos por Mikrotik
+// Endpoint para listar MACs que compraram senhas nos últimos 2 minutos e estão DESCONECTADOS
 app.get('/api/recent-sales/:mikrotik_id', async (req, res, next) => {
   try {
     const { mikrotik_id } = req.params;
@@ -1317,34 +1317,54 @@ app.get('/api/recent-sales/:mikrotik_id', async (req, res, next) => {
       };
     }
 
-    console.log('[RECENT-SALES] Buscando vendas do último 1 minuto para mikrotik:', mikrotik_id);
+    console.log('[RECENT-SALES] Buscando vendas dos últimos 2 minutos para mikrotik:', mikrotik_id);
 
-    // Data do último 1 minuto
+    // Data dos últimos 2 minutos
     const agora = new Date();
-    const umMinutoAtras = new Date(agora.getTime() - 1 * 60 * 1000); // 1 minuto atrás
+    const doisMinutosAtras = new Date(agora.getTime() - 2 * 60 * 1000); // 2 minutos atrás
 
-    // Buscar vendas aprovadas do último 1 minuto para o mikrotik específico
+    // Buscar vendas aprovadas dos últimos 2 minutos para MACs que estão DESCONECTADOS
     const vendas = await handleSupabaseOperation(() =>
       supabaseAdmin
         .from('vendas')
         .select(`
           *,
-          mac_id (mac_address),
+          mac_id (mac_address, status),
           senha_id (usuario, senha),
           plano_id (nome, duracao)
         `)
         .eq('mikrotik_id', mikrotik_id)
         .eq('status', 'aprovado')
-        .gte('pagamento_aprovado_em', umMinutoAtras.toISOString())
+        .gte('pagamento_aprovado_em', doisMinutosAtras.toISOString())
         .order('pagamento_aprovado_em', { ascending: false })
     );
 
     if (!vendas || vendas.length === 0) {
+      console.log('[RECENT-SALES] Nenhuma venda encontrada nos últimos 2 minutos');
+      return res.send('');
+    }
+
+    // Filtrar apenas MACs que estão DESCONECTADOS
+    const vendasDesconectadas = vendas.filter(venda => {
+      const statusMac = venda.mac_id?.status;
+      const isDesconectado = !statusMac || statusMac === 'coletado' || statusMac === 'desconectado' || statusMac === 'precisa_comprar';
+      
+      if (isDesconectado) {
+        console.log(`[RECENT-SALES] MAC ${venda.mac_id?.mac_address} está desconectado (status: ${statusMac}) - incluindo na lista`);
+      } else {
+        console.log(`[RECENT-SALES] MAC ${venda.mac_id?.mac_address} está conectado (status: ${statusMac}) - ignorando`);
+      }
+      
+      return isDesconectado;
+    });
+
+    if (vendasDesconectadas.length === 0) {
+      console.log('[RECENT-SALES] Todas as vendas são de MACs já conectados');
       return res.send('');
     }
 
     // Formatar dados no formato solicitado: user-senha-mac-minutos
-    const vendasFormatadas = vendas.map(venda => {
+    const vendasFormatadas = vendasDesconectadas.map(venda => {
       const usuario = venda.senha_id?.usuario || 'N/A';
       const senha = venda.senha_id?.senha || 'N/A';
       const mac = venda.mac_id?.mac_address || 'N/A';
@@ -1353,7 +1373,7 @@ app.get('/api/recent-sales/:mikrotik_id', async (req, res, next) => {
       return `${usuario}-${senha}-${mac}-${minutos}`;
     });
 
-    console.log(`[RECENT-SALES] Encontradas ${vendas.length} vendas no último 1 minuto`);
+    console.log(`[RECENT-SALES] Encontradas ${vendas.length} vendas totais, ${vendasDesconectadas.length} de MACs desconectados`);
 
     // Retornar apenas texto puro, uma venda por linha
     res.set('Content-Type', 'text/plain');
@@ -1580,21 +1600,11 @@ app.post('/api/mikrotik/auth-notification', async (req, res, next) => {
       action
     });
 
-    // Preparar dados para atualização
+    // Preparar dados para atualização (apenas campos essenciais)
     const dadosAtualizacao = {
       status: novoStatus,
       ultimo_acesso: agora
     };
-
-    // Se forneceu usuário, atualizar também
-    if (usuario) {
-      dadosAtualizacao.ultimo_usuario_mikrotik = usuario;
-    }
-
-    // Se forneceu IP, atualizar também
-    if (ip_address) {
-      dadosAtualizacao.ultimo_ip = ip_address;
-    }
 
     // Atualizar MAC no banco
     const macAtualizado = await handleSupabaseOperation(() =>
@@ -1606,27 +1616,15 @@ app.post('/api/mikrotik/auth-notification', async (req, res, next) => {
         .single()
     );
 
-    // Registrar log da autenticação (opcional - para auditoria)
-    try {
-      await handleSupabaseOperation(() =>
-        supabaseAdmin
-          .from('logs_autenticacao')
-          .insert([{
-            mac_id: macObj.id,
-            mac_address,
-            mikrotik_id,
-            action,
-            usuario_mikrotik: usuario,
-            ip_address,
-            timestamp: agora,
-            status_anterior: macObj.status,
-            status_novo: novoStatus
-          }])
-      );
-    } catch (logError) {
-      // Se a tabela de logs não existe, apenas loga o erro mas não falha a operação
-      console.warn('[MIKROTIK AUTH] Não foi possível salvar log (tabela logs_autenticacao pode não existir):', logError.message);
-    }
+    // Log simples no console (sem tabela de auditoria)
+    console.log('[MIKROTIK AUTH] Ação processada:', {
+      mac_address,
+      action,
+      usuario: usuario || 'N/A',
+      status_anterior: macObj.status,
+      status_novo: novoStatus,
+      timestamp: agora
+    });
 
     console.log('[MIKROTIK AUTH] MAC atualizado com sucesso:', {
       id: macAtualizado.id,
