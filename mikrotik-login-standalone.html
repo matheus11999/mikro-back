@@ -575,9 +575,7 @@
                     </ol>
                 </div>
 
-                <div class="trial-notice">
-                    ⏰ Você terá 5 minutos de acesso grátis para realizar o pagamento!
-                </div>
+
 
                 <button type="button" class="btn btn-primary" onclick="generatePix()">
                     <span>✅</span>
@@ -617,9 +615,7 @@
                     <p style="color: var(--gray); font-size: 14px;">Tempo restante para pagamento</p>
                 </div>
 
-                <div id="trialNotice" class="trial-notice" style="display: none;">
-                    ✅ Acesso temporário liberado
-                </div>
+
 
                 <button type="button" class="btn btn-secondary" onclick="showPasswordScreen()">
                     <span>❌</span>
@@ -1319,114 +1315,68 @@
             }
         }
 
-        // Trial activation - Redirecionamento direto como no MikroTik original
-        async function activateTrial() {
+        // Trial activation - URL exata do MikroTik
+        function activateTrial() {
             if (state.trialActivated) {
                 console.log('Trial já foi ativado anteriormente');
                 return;
             }
             
-            try {
-                console.log('=== ATIVANDO TRIAL - REDIRECIONAMENTO DIRETO ===');
-                
-                // Mark as activated first
-                state.trialActivated = true;
-                
-                // Get MAC address com fallback
-                let mac = state.mac;
-                if (!mac || mac.includes('$(')) {
-                    // Fallback: gerar MAC baseado em timestamp
-                    const timestamp = Date.now().toString();
-                    mac = timestamp.slice(-12).match(/.{2}/g).join(':');
-                    console.warn('MAC não disponível, usando fallback:', mac);
-                }
-                
-                // Get login URL com fallbacks
-                let loginUrl = null;
-                
-                // Tenta pegar do form action primeiro
-                const form = document.getElementById('loginForm');
-                if (form && form.action && !form.action.includes('$(')) {
-                    loginUrl = form.action;
-                }
-                
-                // Fallback para state.linkLogin
-                if (!loginUrl && state.linkLogin && !state.linkLogin.includes('$(')) {
-                    loginUrl = state.linkLogin;
-                }
-                
-                // Fallback para URL construída
-                if (!loginUrl) {
-                    const currentUrl = window.location.href;
-                    const urlObj = new URL(currentUrl);
-                    loginUrl = urlObj.protocol + '//' + urlObj.host + '/login';
-                }
-                
-                // Último fallback: URL padrão
-                if (!loginUrl) {
-                    loginUrl = 'http://10.5.50.1/login';
-                }
-                
-                // Gera username do trial (como no original: T-$(mac-esc))
-                const trialUsername = 'T-' + mac.replace(/:/g, '');
-                
-                // Constrói URL do trial exatamente como no MikroTik original
-                // Formato: $(link-login-only)?dst=$(link-orig-esc)&username=T-$(mac-esc)
-                let trialUrl = loginUrl;
-                const params = [];
-                
-                // Adiciona dst se disponível
-                if (state.linkOrig && !state.linkOrig.includes('$(')) {
-                    params.push('dst=' + encodeURIComponent(state.linkOrig));
-                }
-                
-                // Adiciona username do trial
-                params.push('username=' + encodeURIComponent(trialUsername));
-                
-                // Monta URL final
-                if (params.length > 0) {
-                    trialUrl += (trialUrl.includes('?') ? '&' : '?') + params.join('&');
-                }
-                
-                console.log('Trial Username:', trialUsername);
-                console.log('Trial URL:', trialUrl);
-                console.log('MAC usado:', mac);
-                console.log('Login URL base:', loginUrl);
-                console.log('Link Orig:', state.linkOrig);
-                
-                // Mostra notice discreta
-                const trialNotice = document.getElementById('trialNotice');
-                trialNotice.style.display = 'block';
-                trialNotice.innerHTML = '✅ Ativando acesso temporário...';
-                
-                // Pequeno delay para mostrar a mensagem
-                setTimeout(() => {
-                    console.log('🚀 REDIRECIONANDO PARA TRIAL:', trialUrl);
-                    // Redirecionamento direto (como no link original do MikroTik)
-                    window.location.href = trialUrl;
-                }, 500);
-                
-            } catch (error) {
-                console.error('Erro ao ativar trial:', error);
-                
-                // Fallback final: tenta URLs padrão
-                const fallbackUrls = [
-                    'http://10.5.50.1/login?username=T-trial',
-                    'http://192.168.1.1/login?username=T-trial',
-                    'http://192.168.0.1/login?username=T-trial'
-                ];
-                
-                console.log('Tentando fallback URLs...');
-                for (const url of fallbackUrls) {
-                    try {
-                        console.log('Tentando:', url);
-                        window.location.href = url;
-                        break;
-                    } catch (fallbackError) {
-                        console.warn('Fallback falhou:', fallbackError);
-                    }
-                }
+            console.log('=== ATIVANDO TRIAL - URL MIKROTIK ===');
+            
+            // Mark as activated
+            state.trialActivated = true;
+            
+            // Pega informações direto do MikroTik (como no exemplo original)
+            const form = document.getElementById('loginForm');
+            const linkLoginOnly = form ? form.action : null;
+            const linkOrig = state.linkOrig;
+            const mac = state.mac;
+            
+            console.log('Informações do MikroTik:');
+            console.log('- link-login-only:', linkLoginOnly);
+            console.log('- link-orig:', linkOrig);
+            console.log('- mac:', mac);
+            
+            // Verifica se temos as informações necessárias
+            if (!linkLoginOnly || linkLoginOnly.includes('$(')) {
+                console.error('❌ link-login-only não disponível');
+                return;
             }
+            
+            if (!mac || mac.includes('$(')) {
+                console.error('❌ MAC address não disponível');
+                return;
+            }
+            
+            // Monta URL exatamente como no exemplo original:
+            // $(link-login-only)?dst=$(link-orig-esc)&username=T-$(mac-esc)
+            let trialUrl = linkLoginOnly;
+            
+            // Adiciona parâmetros
+            const params = [];
+            
+            // dst=$(link-orig-esc)
+            if (linkOrig && !linkOrig.includes('$(')) {
+                params.push('dst=' + encodeURIComponent(linkOrig));
+            }
+            
+            // username=T-$(mac-esc) - remove : do MAC
+            const macEscaped = mac.replace(/:/g, '');
+            params.push('username=T-' + macEscaped);
+            
+            // Monta URL final
+            if (params.length > 0) {
+                trialUrl += (trialUrl.includes('?') ? '&' : '?') + params.join('&');
+            }
+            
+            console.log('🚀 URL DO TRIAL:', trialUrl);
+            console.log('🚀 MAC ESCAPED:', macEscaped);
+            console.log('🚀 USERNAME:', 'T-' + macEscaped);
+            
+            // Redirecionamento direto (como clicar no link do MikroTik)
+            console.log('REDIRECIONANDO AGORA...');
+            window.location.href = trialUrl;
         }
 
         // Payment checking
