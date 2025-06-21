@@ -729,6 +729,10 @@
         function getUrlParams() {
             const urlParams = new URLSearchParams(window.location.search);
             
+            console.log('=== CAPTURANDO PARÂMETROS ===');
+            console.log('URL completa:', window.location.href);
+            console.log('Query string:', window.location.search);
+            
             // Get MikroTik data from URL parameters or MikroTik variables
             state.mac = urlParams.get('mac') || '$(mac)';
             state.ip = urlParams.get('ip') || '$(ip)';
@@ -745,6 +749,14 @@
             if (urlApiUrl) state.apiUrl = urlApiUrl;
             if (urlDebug === 'true' || urlDebug === '1') state.debug = true;
             
+            console.log('Valores brutos capturados:');
+            console.log('- MAC:', state.mac);
+            console.log('- IP:', state.ip);
+            console.log('- Interface:', state.interface);
+            console.log('- Link Orig:', state.linkOrig);
+            console.log('- Link Login:', state.linkLogin);
+            console.log('- Form action:', document.getElementById('loginForm')?.action);
+            
             // Clean MikroTik variables (remove $() if not processed)
             if (state.mac && state.mac.includes('$(')) state.mac = null;
             if (state.ip && state.ip.includes('$(')) state.ip = null;
@@ -752,7 +764,13 @@
             if (state.linkOrig && state.linkOrig.includes('$(')) state.linkOrig = null;
             if (state.linkLogin && state.linkLogin.includes('$(')) state.linkLogin = null;
             
-            console.log('URL Parameters processed:', state);
+            console.log('Valores limpos:', {
+                mac: state.mac,
+                ip: state.ip,
+                interface: state.interface,
+                linkOrig: state.linkOrig,
+                linkLogin: state.linkLogin
+            });
         }
 
         // Screen management
@@ -1151,61 +1169,83 @@
 
         // Trial activation
         async function activateTrial() {
-            if (state.trialActivated) return;
+            if (state.trialActivated) {
+                console.log('Trial já foi ativado anteriormente');
+                return;
+            }
             
             try {
-                console.log('Ativando trial de 5 minutos...');
+                console.log('=== ATIVANDO TRIAL ===');
+                console.log('MAC:', state.mac);
+                console.log('Link Login:', state.linkLogin);
+                console.log('Link Orig:', state.linkOrig);
                 
-                // Generate trial username based on MAC address (similar to example)
-                const trialUsername = 'T-' + (state.mac ? state.mac.replace(/:/g, '-') : '');
-                
-                // Check if we have MikroTik login URL
-                if (!state.linkLogin || state.linkLogin.includes('$(')) {
-                    // Se não temos o link, tenta usar o action do form
-                    const form = document.getElementById('loginForm');
-                    const formAction = form.action;
-                    
-                    if (!formAction || formAction.includes('$(')) {
-                        console.warn('Link de login do MikroTik não disponível');
-                        showMessage('⚠️ Trial disponível apenas quando conectado ao MikroTik', 'warning');
-                        return;
-                    }
-                    
-                    state.linkLogin = formAction;
+                // Validate MAC
+                if (!state.mac || state.mac.includes('$(')) {
+                    console.error('MAC address não disponível');
+                    showMessage('❌ MAC address não encontrado. Conecte-se ao WiFi primeiro.', 'error');
+                    return;
                 }
                 
-                // Build trial URL similar to the example: $(link-login-only)?dst=$(link-orig-esc)&username=T-$(mac-esc)
-                let trialUrl = state.linkLogin;
+                // Generate trial username based on MAC address
+                const trialUsername = 'T-' + state.mac.replace(/:/g, '-');
+                console.log('Trial Username:', trialUsername);
+                
+                // Get login URL
+                let loginUrl = state.linkLogin;
+                
+                // If no link, try form action
+                if (!loginUrl || loginUrl.includes('$(')) {
+                    const form = document.getElementById('loginForm');
+                    loginUrl = form ? form.action : null;
+                    console.log('Usando action do form:', loginUrl);
+                }
+                
+                // Still no valid URL?
+                if (!loginUrl || loginUrl.includes('$(')) {
+                    console.error('URL de login não disponível');
+                    showMessage('⚠️ Trial disponível apenas quando acessado pelo MikroTik', 'warning');
+                    document.getElementById('trialNotice').innerHTML = 
+                        '❌ Trial não disponível - Acesse pelo portal do MikroTik';
+                    return;
+                }
+                
+                // Build trial URL
+                let trialUrl = loginUrl;
                 
                 // Add parameters
                 const params = new URLSearchParams();
+                params.append('username', trialUsername);
+                
+                // Add destination if available
                 if (state.linkOrig && !state.linkOrig.includes('$(')) {
                     params.append('dst', state.linkOrig);
                 }
-                params.append('username', trialUsername);
                 
                 // Append parameters to URL
-                if (trialUrl.includes('?')) {
-                    trialUrl += '&' + params.toString();
-                } else {
-                    trialUrl += '?' + params.toString();
-                }
+                const separator = trialUrl.includes('?') ? '&' : '?';
+                trialUrl = trialUrl + separator + params.toString();
                 
-                console.log('Ativando trial com URL:', trialUrl);
+                console.log('URL do Trial:', trialUrl);
                 
                 // Update notice
-                document.getElementById('trialNotice').innerHTML = '✅ Trial de 5 minutos ativado! Redirecionando...';
+                document.getElementById('trialNotice').innerHTML = 
+                    '✅ Trial de 5 minutos ativado! Redirecionando em 2 segundos...';
                 
-                // Small delay before redirect
-                setTimeout(() => {
-                    window.location.href = trialUrl;
-                }, 1000);
-                
+                // Mark as activated
                 state.trialActivated = true;
+                
+                // Redirect after delay
+                setTimeout(() => {
+                    console.log('Redirecionando para:', trialUrl);
+                    window.location.href = trialUrl;
+                }, 2000);
                 
             } catch (error) {
                 console.error('Erro ao ativar trial:', error);
-                showMessage('Erro ao ativar trial', 'error');
+                showMessage('❌ Erro ao ativar trial: ' + error.message, 'error');
+                document.getElementById('trialNotice').innerHTML = 
+                    '❌ Erro ao ativar trial. Tente novamente.';
             }
         }
 

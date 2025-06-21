@@ -1237,6 +1237,208 @@ app.post('/api/captive-check/poll-payment', async (req, res, next) => {
   }
 });
 
+// Webhook do Mercado Pago para receber notificações de pagamento
+app.post('/api/webhook/mercadopago', async (req, res, next) => {
+  try {
+    console.log('[WEBHOOK MP] Notificação recebida:', {
+      headers: req.headers,
+      body: req.body,
+      query: req.query
+    });
+    
+    // Responde imediatamente ao Mercado Pago
+    res.status(200).send('OK');
+    
+    // Processa a notificação de forma assíncrona
+    const { id, topic, type, action, data } = req.body;
+    
+    // Verifica se é uma notificação de pagamento
+    if (topic === 'payment' || type === 'payment') {
+      const paymentId = id || data?.id;
+      
+      if (!paymentId) {
+        console.error('[WEBHOOK MP] ID do pagamento não encontrado na notificação');
+        return;
+      }
+      
+      console.log(`[WEBHOOK MP] Processando pagamento ${paymentId}...`);
+      
+      // Aguarda um pouco para garantir que o pagamento esteja atualizado no MP
+      setTimeout(async () => {
+        try {
+          // Consulta detalhes do pagamento no Mercado Pago
+          const mpData = await handleMercadoPagoFetch(`https://api.mercadopago.com/v1/payments/${paymentId}`);
+          
+          console.log(`[WEBHOOK MP] Status do pagamento ${paymentId}: ${mpData.status}`);
+          
+          if (mpData.status === 'approved') {
+            // Busca a venda correspondente
+            const venda = await handleSupabaseOperation(() =>
+              supabaseAdmin
+                .from('vendas')
+                .select('*, mac_id(*), plano_id(*), mikrotik_id(*)')
+                .eq('payment_id', paymentId)
+                .single()
+            );
+            
+            if (!venda) {
+              console.error(`[WEBHOOK MP] Venda não encontrada para payment_id ${paymentId}`);
+              return;
+            }
+            
+            // Se já foi processada, ignora
+            if (venda.status === 'aprovado') {
+              console.log(`[WEBHOOK MP] Pagamento ${paymentId} já foi processado anteriormente`);
+              return;
+            }
+            
+            console.log(`[WEBHOOK MP] Processando aprovação do pagamento ${paymentId}...`);
+            
+            // Busca senha disponível
+            let senha = null;
+            try {
+              const senhasDisponiveis = await handleSupabaseOperation(() =>
+                supabaseAdmin
+                  .from('senhas')
+                  .select('*')
+                  .eq('plano_id', venda.plano_id.id)
+                  .eq('vendida', false)
+                  .limit(1)
+              );
+              
+              if (senhasDisponiveis && senhasDisponiveis.length > 0) {
+                senha = senhasDisponiveis[0];
+              }
+            } catch (err) {
+              console.error(`[WEBHOOK MP] Erro ao buscar senhas:`, err);
+            }
+            
+            if (!senha) {
+              console.error(`[WEBHOOK MP] Sem senhas disponíveis para o plano ${venda.plano_id.id}`);
+              // Aqui você pode implementar uma notificação para o admin
+              return;
+            }
+            
+            // Marca senha como vendida
+            await handleSupabaseOperation(() =>
+              supabaseAdmin
+                .from('senhas')
+                .update({ 
+                  vendida: true,
+                  vendida_em: new Date().toISOString()
+                })
+                .eq('id', senha.id)
+            );
+            
+            // Busca informações do mikrotik
+            const mikrotikInfo = await handleSupabaseOperation(() =>
+              supabaseAdmin
+                .from('mikrotiks')
+                .select('cliente_id, profitpercentage')
+                .eq('id', venda.mikrotik_id.id)
+                .single()
+            );
+            
+            // Calcula comissões
+            let porcentagemAdmin = mikrotikInfo?.profitpercentage || 10;
+            if (porcentagemAdmin > 100) porcentagemAdmin = 100;
+            if (porcentagemAdmin < 0) porcentagemAdmin = 0;
+            
+            const comissaoAdmin = venda.preco * (porcentagemAdmin / 100);
+            const comissaoDono = venda.preco - comissaoAdmin;
+            
+            // Atualiza saldos
+            await supabaseAdmin.rpc('incrementar_saldo_admin', { valor: comissaoAdmin });
+            
+            if (mikrotikInfo?.cliente_id) {
+              await supabaseAdmin.rpc('incrementar_saldo_cliente', { 
+                cliente_id: mikrotikInfo.cliente_id, 
+                valor: comissaoDono 
+              });
+            }
+            
+            // Atualiza venda
+            await handleSupabaseOperation(() =>
+              supabaseAdmin
+                .from('vendas')
+                .update({
+                  status: 'aprovado',
+                  pagamento_aprovado_em: new Date().toISOString(),
+                  senha_id: senha.id,
+                  lucro: comissaoAdmin,
+                  valor: comissaoDono
+                })
+                .eq('id', venda.id)
+            );
+            
+            // Atualiza MAC
+            await handleSupabaseOperation(() =>
+              supabaseAdmin
+                .from('macs')
+                .update({
+                  total_gasto: (venda.mac_id.total_gasto || 0) + Number(venda.preco),
+                  total_compras: (venda.mac_id.total_compras || 0) + 1,
+                  ultimo_plano: venda.plano_id.nome,
+                  ultimo_valor: venda.preco,
+                  ultimo_acesso: new Date().toISOString(),
+                  status_pagamento: 'aprovado',
+                  pagamento_aprovado_em: new Date().toISOString()
+                })
+                .eq('id', venda.mac_id.id)
+            );
+            
+            console.log(`[WEBHOOK MP] Pagamento ${paymentId} processado com sucesso!`);
+            console.log(`[WEBHOOK MP] Senha entregue: ${senha.usuario}`);
+            
+            // Se houver webhook do mikrotik configurado, envia os dados
+            try {
+              // Busca webhook do mikrotik se existir
+              const mikrotikData = await handleSupabaseOperation(() =>
+                supabaseAdmin
+                  .from('mikrotiks')
+                  .select('webhook_url')
+                  .eq('id', venda.mikrotik_id.id)
+                  .single()
+              );
+              
+              if (mikrotikData?.webhook_url) {
+                const userData = `${senha.usuario}:${senha.senha}:${venda.mac_id.mac_address}:${venda.plano_id.duracao}`;
+                
+                await fetch(mikrotikData.webhook_url, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'text/plain' },
+                  body: userData
+                });
+                
+                console.log('[WEBHOOK MP] Dados enviados para Mikrotik via webhook');
+              }
+            } catch (webhookError) {
+              // Ignora erro de webhook do mikrotik
+              console.log('[WEBHOOK MP] Mikrotik sem webhook configurado ou erro ao enviar');
+            }
+          }
+          
+        } catch (error) {
+          console.error('[WEBHOOK MP] Erro ao processar pagamento:', error);
+        }
+      }, 2000); // Aguarda 2 segundos antes de processar
+    }
+    
+  } catch (error) {
+    console.error('[WEBHOOK MP] Erro no webhook:', error);
+    // Mesmo com erro, retorna 200 para o MP não reenviar
+    if (!res.headersSent) {
+      res.status(200).send('OK');
+    }
+  }
+});
+
+// Endpoint GET para o webhook (alguns sistemas fazem verificação GET primeiro)
+app.get('/api/webhook/mercadopago', (req, res) => {
+  console.log('[WEBHOOK MP] Verificação GET recebida');
+  res.status(200).send('Webhook do Mercado Pago está ativo');
+});
+
 // Endpoint para listar MACs que compraram senhas nos últimos 10 minutos por Mikrotik
 app.get('/api/recent-sales/:mikrotik_id', async (req, res, next) => {
   try {
@@ -1455,18 +1657,26 @@ async function verificarPagamentosPendentes() {
           console.log(`[AUTO-CHECK] Pagamento ${venda.payment_id} aprovado! Processando...`);
           
           // Busca senha disponível
-          const senha = await handleSupabaseOperation(() =>
-            supabaseAdmin
-              .from('senhas')
-              .select('*')
-              .eq('plano_id', venda.plano_id.id)
-              .eq('vendida', false)
-              .limit(1)
-              .single()
-          );
+          let senha = null;
+          try {
+            const senhasDisponiveis = await handleSupabaseOperation(() =>
+              supabaseAdmin
+                .from('senhas')
+                .select('*')
+                .eq('plano_id', venda.plano_id.id)
+                .eq('vendida', false)
+                .limit(1)
+            );
+            
+            if (senhasDisponiveis && senhasDisponiveis.length > 0) {
+              senha = senhasDisponiveis[0];
+            }
+          } catch (err) {
+            console.error(`[AUTO-CHECK] Erro ao buscar senhas:`, err);
+          }
           
           if (!senha) {
-            console.error(`[AUTO-CHECK] Sem senhas disponíveis para o plano ${venda.plano_id.id}`);
+            console.error(`[AUTO-CHECK] Sem senhas disponíveis para o plano ${venda.plano_id.id} (${venda.plano_id.nome})`);
             continue;
           }
           
@@ -1485,7 +1695,7 @@ async function verificarPagamentosPendentes() {
           const mikrotikInfo = await handleSupabaseOperation(() =>
             supabaseAdmin
               .from('mikrotiks')
-              .select('cliente_id, profitpercentage, webhook_url')
+              .select('cliente_id, profitpercentage')
               .eq('id', venda.mikrotik_id.id)
               .single()
           );
@@ -1522,22 +1732,8 @@ async function verificarPagamentosPendentes() {
               .eq('id', venda.id)
           );
           
-          // Enviar para Mikrotik via webhook
-          if (mikrotikInfo?.webhook_url) {
-            try {
-              const userData = `${senha.usuario}:${senha.senha}:${venda.mac_id.mac_address}:${venda.plano_id.duracao}`;
-              
-              await fetch(mikrotikInfo.webhook_url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain' },
-                body: userData
-              });
-              
-              console.log('[AUTO-CHECK] Dados enviados para Mikrotik via webhook');
-            } catch (webhookError) {
-              console.log('[AUTO-CHECK] Erro ao enviar webhook:', webhookError);
-            }
-          }
+          // Log de sucesso (webhook removido temporariamente)
+          console.log('[AUTO-CHECK] Senha atribuída com sucesso');
           
           // Atualiza MAC
           await handleSupabaseOperation(() =>
