@@ -1317,13 +1317,13 @@ app.get('/api/recent-sales/:mikrotik_id', async (req, res, next) => {
       };
     }
 
-    console.log('[RECENT-SALES] Buscando vendas dos últimos 10 minutos para mikrotik:', mikrotik_id);
+    console.log('[RECENT-SALES] Buscando vendas do último 1 minuto para mikrotik:', mikrotik_id);
 
-    // Data dos últimos 10 minutos
+    // Data do último 1 minuto
     const agora = new Date();
-    const dezMinutosAtras = new Date(agora.getTime() - 10 * 60 * 1000); // 10 minutos atrás
+    const umMinutoAtras = new Date(agora.getTime() - 1 * 60 * 1000); // 1 minuto atrás
 
-    // Buscar vendas aprovadas dos últimos 10 minutos para o mikrotik específico
+    // Buscar vendas aprovadas do último 1 minuto para o mikrotik específico
     const vendas = await handleSupabaseOperation(() =>
       supabaseAdmin
         .from('vendas')
@@ -1335,7 +1335,7 @@ app.get('/api/recent-sales/:mikrotik_id', async (req, res, next) => {
         `)
         .eq('mikrotik_id', mikrotik_id)
         .eq('status', 'aprovado')
-        .gte('pagamento_aprovado_em', dezMinutosAtras.toISOString())
+        .gte('pagamento_aprovado_em', umMinutoAtras.toISOString())
         .order('pagamento_aprovado_em', { ascending: false })
     );
 
@@ -1353,7 +1353,7 @@ app.get('/api/recent-sales/:mikrotik_id', async (req, res, next) => {
       return `${usuario}-${senha}-${mac}-${minutos}`;
     });
 
-    console.log(`[RECENT-SALES] Encontradas ${vendas.length} vendas nos últimos 10 minutos`);
+    console.log(`[RECENT-SALES] Encontradas ${vendas.length} vendas no último 1 minuto`);
 
     // Retornar apenas texto puro, uma venda por linha
     res.set('Content-Type', 'text/plain');
