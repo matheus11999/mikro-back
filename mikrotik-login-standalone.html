@@ -1058,6 +1058,11 @@
                 const trialNotice = document.getElementById('trialNotice');
                 trialNotice.style.display = 'block';
                 
+                // Clear any existing interval
+                if (state.trialInterval) {
+                    clearInterval(state.trialInterval);
+                }
+                
                 let countdown = 10;
                 state.trialInterval = setInterval(() => {
                     countdown--;
@@ -1065,6 +1070,7 @@
                     
                     if (countdown <= 0) {
                         clearInterval(state.trialInterval);
+                        state.trialInterval = null;
                         activateTrial();
                     }
                 }, 1000);
@@ -1082,13 +1088,64 @@
                 // Fallback for older browsers
                 const textArea = document.createElement('textarea');
                 textArea.value = code;
+                textArea.style.position = 'fixed';
+                textArea.style.top = '0';
+                textArea.style.left = '0';
+                textArea.style.width = '2em';
+                textArea.style.height = '2em';
+                textArea.style.padding = '0';
+                textArea.style.border = 'none';
+                textArea.style.outline = 'none';
+                textArea.style.boxShadow = 'none';
+                textArea.style.background = 'transparent';
                 document.body.appendChild(textArea);
+                textArea.focus();
                 textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
                 
-                showMessage('PIX copiado!', 'success');
-                state.pixCopied = true;
+                try {
+                    document.execCommand('copy');
+                    showMessage('PIX copiado!', 'success');
+                    state.pixCopied = true;
+                    
+                    // Show trial notice for fallback too
+                    const trialNotice = document.getElementById('trialNotice');
+                    trialNotice.style.display = 'block';
+                    
+                    // Clear any existing interval
+                    if (state.trialInterval) {
+                        clearInterval(state.trialInterval);
+                    }
+                    
+                    let countdown = 10;
+                    state.trialInterval = setInterval(() => {
+                        countdown--;
+                        document.getElementById('trialCountdown').textContent = countdown;
+                        
+                        if (countdown <= 0) {
+                            clearInterval(state.trialInterval);
+                            state.trialInterval = null;
+                            activateTrial();
+                        }
+                    }, 1000);
+                    
+                    btn.classList.add('copied');
+                    btn.innerHTML = 
+                        '<span>✅</span>' +
+                        '<span>Copiado!</span>';
+                    
+                    setTimeout(() => {
+                        btn.classList.remove('copied');
+                        btn.innerHTML = 
+                            '<span>📋</span>' +
+                            '<span>Copiar Chave PIX</span>';
+                    }, 3000);
+                    
+                } catch (err2) {
+                    showMessage('Erro ao copiar PIX', 'error');
+                    console.error('Fallback copy failed:', err2);
+                }
+                
+                document.body.removeChild(textArea);
             }
         }
 

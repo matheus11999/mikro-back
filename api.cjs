@@ -1416,6 +1416,159 @@ if (process.env.APP_MODE !== 'frontend') {
   });
 }
 
+// Função para verificar pagamentos pendentes automaticamente
+async function verificarPagamentosPendentes() {
+  try {
+    console.log('[AUTO-CHECK] Verificando pagamentos pendentes...');
+    
+    // Busca vendas pendentes dos últimos 10 minutos
+    const agora = new Date();
+    const dezMinutosAtras = new Date(agora.getTime() - 10 * 60 * 1000);
+    
+    const vendasPendentes = await handleSupabaseOperation(() =>
+      supabaseAdmin
+        .from('vendas')
+        .select('*, mac_id(*), plano_id(*), mikrotik_id(*)')
+        .in('status', ['aguardando', 'pendente'])
+        .gte('pagamento_gerado_em', dezMinutosAtras.toISOString())
+        .not('payment_id', 'is', null)
+    );
+    
+    if (!vendasPendentes || vendasPendentes.length === 0) {
+      console.log('[AUTO-CHECK] Nenhum pagamento pendente encontrado');
+      return;
+    }
+    
+    console.log(`[AUTO-CHECK] ${vendasPendentes.length} pagamento(s) pendente(s) encontrado(s)`);
+    
+    // Verifica cada pagamento pendente
+    for (const venda of vendasPendentes) {
+      try {
+        console.log(`[AUTO-CHECK] Verificando pagamento ${venda.payment_id}...`);
+        
+        const mpData = await handleMercadoPagoFetch(`https://api.mercadopago.com/v1/payments/${venda.payment_id}`);
+        
+        console.log(`[AUTO-CHECK] Status do pagamento ${venda.payment_id}: ${mpData.status}`);
+        
+        // Se o pagamento foi aprovado
+        if (mpData.status === 'approved') {
+          console.log(`[AUTO-CHECK] Pagamento ${venda.payment_id} aprovado! Processando...`);
+          
+          // Busca senha disponível
+          const senha = await handleSupabaseOperation(() =>
+            supabaseAdmin
+              .from('senhas')
+              .select('*')
+              .eq('plano_id', venda.plano_id.id)
+              .eq('vendida', false)
+              .limit(1)
+              .single()
+          );
+          
+          if (!senha) {
+            console.error(`[AUTO-CHECK] Sem senhas disponíveis para o plano ${venda.plano_id.id}`);
+            continue;
+          }
+          
+          // Marca senha como vendida
+          await handleSupabaseOperation(() =>
+            supabaseAdmin
+              .from('senhas')
+              .update({ 
+                vendida: true,
+                vendida_em: new Date().toISOString()
+              })
+              .eq('id', senha.id)
+          );
+          
+          // Busca informações do mikrotik
+          const mikrotikInfo = await handleSupabaseOperation(() =>
+            supabaseAdmin
+              .from('mikrotiks')
+              .select('cliente_id, profitpercentage, webhook_url')
+              .eq('id', venda.mikrotik_id.id)
+              .single()
+          );
+          
+          // Calcula comissões
+          let porcentagemAdmin = mikrotikInfo?.profitpercentage || 10;
+          if (porcentagemAdmin > 100) porcentagemAdmin = 100;
+          if (porcentagemAdmin < 0) porcentagemAdmin = 0;
+          
+          const comissaoAdmin = venda.preco * (porcentagemAdmin / 100);
+          const comissaoDono = venda.preco - comissaoAdmin;
+          
+          // Atualiza saldos
+          await supabaseAdmin.rpc('incrementar_saldo_admin', { valor: comissaoAdmin });
+          
+          if (mikrotikInfo?.cliente_id) {
+            await supabaseAdmin.rpc('incrementar_saldo_cliente', { 
+              cliente_id: mikrotikInfo.cliente_id, 
+              valor: comissaoDono 
+            });
+          }
+          
+          // Atualiza venda
+          await handleSupabaseOperation(() =>
+            supabaseAdmin
+              .from('vendas')
+              .update({
+                status: 'aprovado',
+                pagamento_aprovado_em: new Date().toISOString(),
+                senha_id: senha.id,
+                lucro: comissaoAdmin,
+                valor: comissaoDono
+              })
+              .eq('id', venda.id)
+          );
+          
+          // Enviar para Mikrotik via webhook
+          if (mikrotikInfo?.webhook_url) {
+            try {
+              const userData = `${senha.usuario}:${senha.senha}:${venda.mac_id.mac_address}:${venda.plano_id.duracao}`;
+              
+              await fetch(mikrotikInfo.webhook_url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: userData
+              });
+              
+              console.log('[AUTO-CHECK] Dados enviados para Mikrotik via webhook');
+            } catch (webhookError) {
+              console.log('[AUTO-CHECK] Erro ao enviar webhook:', webhookError);
+            }
+          }
+          
+          // Atualiza MAC
+          await handleSupabaseOperation(() =>
+            supabaseAdmin
+              .from('macs')
+              .update({
+                total_gasto: (venda.mac_id.total_gasto || 0) + Number(venda.preco),
+                total_compras: (venda.mac_id.total_compras || 0) + 1,
+                ultimo_plano: venda.plano_id.nome,
+                ultimo_valor: venda.preco,
+                ultimo_acesso: new Date().toISOString(),
+                status_pagamento: 'aprovado',
+                pagamento_aprovado_em: new Date().toISOString()
+              })
+              .eq('id', venda.mac_id.id)
+          );
+          
+          console.log(`[AUTO-CHECK] Pagamento ${venda.payment_id} processado com sucesso!`);
+          console.log(`[AUTO-CHECK] Senha entregue: ${senha.usuario}`);
+        }
+        
+      } catch (error) {
+        console.error(`[AUTO-CHECK] Erro ao verificar pagamento ${venda.payment_id}:`, error);
+      }
+    }
+    
+  } catch (error) {
+    console.error('[AUTO-CHECK] Erro na verificação automática:', error);
+  }
+}
+
 // Porta
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
@@ -1427,4 +1580,11 @@ app.listen(port, () => {
     console.log(`API disponível em: http://localhost:${port}/`);
     console.log(`Frontend disponível em: http://localhost:${process.env.FRONTEND_PORT || 5173}/`);
   }
+  
+  // Inicia verificação automática de pagamentos a cada 30 segundos
+  console.log('[AUTO-CHECK] Iniciando verificação automática de pagamentos...');
+  setInterval(verificarPagamentosPendentes, 30000); // 30 segundos
+  
+  // Executa primeira verificação após 5 segundos
+  setTimeout(verificarPagamentosPendentes, 5000);
 }); 
