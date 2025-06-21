@@ -1341,9 +1341,8 @@
                 params.push('dst=' + encodeURIComponent(linkOrig));
             }
             
-            // username=T-$(mac-esc) - remove : do MAC
-            const macEscaped = mac.replace(/:/g, '');
-            params.push('username=T-' + macEscaped);
+            // username=T-$(mac-esc) - mantém os : do MAC
+            params.push('username=T-' + mac);
             
             // Monta URL final
             if (params.length > 0) {
@@ -1351,8 +1350,8 @@
             }
             
             console.log('🚀 URL DO TRIAL:', trialUrl);
-            console.log('🚀 MAC ESCAPED:', macEscaped);
-            console.log('🚀 USERNAME:', 'T-' + macEscaped);
+            console.log('🚀 MAC ORIGINAL:', mac);
+            console.log('🚀 USERNAME:', 'T-' + mac);
             
             // Redirecionamento direto (como clicar no link do MikroTik)
             console.log('REDIRECIONANDO AGORA...');
