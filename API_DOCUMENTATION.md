@@ -472,7 +472,7 @@ async function obterVendasRecentes(mikrotikId) {
     } else {
       throw new Error(`HTTP ${response.status}`);
     }
-  } catch (error) {
+    } catch (error) {
     console.error('Erro na requisição:', error);
     return [];
   }
@@ -580,10 +580,10 @@ class CaptivePortalAPI {
 
   async verificarStatus(mac, mikrotikId) {
     const response = await fetch(`${this.baseUrl}/status`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mac, mikrotik_id: mikrotikId })
-    });
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mac, mikrotik_id: mikrotikId })
+      });
     return response.json();
   }
 
@@ -607,8 +607,8 @@ class CaptivePortalAPI {
 
   async verificarPagamento(mac, mikrotikId, planoId) {
     const response = await fetch(`${this.baseUrl}/verify`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mac, mikrotik_id: mikrotikId, plano_id: planoId })
     });
     return response.json();
@@ -676,7 +676,7 @@ class CaptivePortalAPI {
       const pix = await this.gerarPix(mac, mikrotikId, plano.id);
       console.log('PIX gerado:', pix.payment_id);
 
-      return {
+  return {
         sucesso: false,
         motivo: 'pix_gerado',
         pix: pix,
@@ -898,7 +898,7 @@ class APIMonitor {
         vendas_10min: totalVendas,
         timestamp: new Date().toISOString()
       };
-    } catch (error) {
+  } catch (error) {
       return {
         status: 'offline',
         erro: error.message,

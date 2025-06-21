@@ -1027,10 +1027,10 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
   }
 });
 
-// 4. Endpoint de polling para pagamentos pendentes
-app.post('/api/captive-check/poll-payment', async (req, res, next) => {
+// Endpoint simples para verificar status de pagamento (apenas consulta)
+app.get('/api/captive-check/payment-status/:payment_id', async (req, res, next) => {
   try {
-    const { payment_id } = req.body;
+    const { payment_id } = req.params;
     
     if (!payment_id) {
       return res.status(400).json({
@@ -1039,13 +1039,13 @@ app.post('/api/captive-check/poll-payment', async (req, res, next) => {
       });
     }
 
-    console.log('[POLL-PAYMENT] Verificando pagamento:', payment_id);
+    console.log('[PAYMENT-STATUS] Consultando status:', payment_id);
 
     // Busca a venda pelo payment_id
     const venda = await handleSupabaseOperation(() =>
       supabaseAdmin
         .from('vendas')
-        .select('*, mac_id(*), plano_id(*), mikrotik_id(*)')
+        .select('*, senha_id(*), plano_id(*)')
         .eq('payment_id', payment_id)
         .single()
     );
@@ -1059,179 +1059,23 @@ app.post('/api/captive-check/poll-payment', async (req, res, next) => {
 
     // Se já está aprovado, retorna os dados
     if (venda.status === 'aprovado' && venda.senha_id) {
-      const senha = await handleSupabaseOperation(() =>
-        supabaseAdmin
-          .from('senhas')
-          .select('*')
-          .eq('id', venda.senha_id)
-          .single()
-      );
-
       return res.json({
         status: 'approved',
         payment_status: 'approved',
-        username: senha?.usuario,
-        password: senha?.senha,
+        username: venda.senha_id?.usuario,
+        password: venda.senha_id?.senha,
         plano: venda.plano_id?.nome,
         duracao: venda.plano_id?.duracao || 60,
-        message: 'Pagamento já foi processado'
+        message: 'Pagamento aprovado - credenciais disponíveis'
       });
     }
 
-    // Consulta o status no Mercado Pago
-    try {
-      const mpData = await handleMercadoPagoFetch(`https://api.mercadopago.com/v1/payments/${payment_id}`);
-      
-      console.log('[POLL-PAYMENT] Status Mercado Pago:', {
-        id: mpData.id,
-        status: mpData.status,
-        status_detail: mpData.status_detail
-      });
-
-      // Se o pagamento foi aprovado no Mercado Pago
-      if (mpData.status === 'approved') {
-        console.log('[POLL-PAYMENT] Pagamento aprovado detectado, processando...');
-        
-        // Busca senha disponível
-        const senha = await handleSupabaseOperation(() =>
-          supabaseAdmin
-            .from('senhas')
-            .select('*')
-            .eq('plano_id', venda.plano_id.id)
-            .eq('vendida', false)
-            .limit(1)
-            .single()
-        );
-
-        if (!senha) {
-          return res.status(500).json({
-            error: 'Não há senhas disponíveis',
-            code: 'NO_PASSWORD_AVAILABLE'
-          });
-        }
-
-        // Marca senha como vendida
-        await handleSupabaseOperation(() =>
-          supabaseAdmin
-            .from('senhas')
-            .update({ 
-              vendida: true,
-              vendida_em: new Date().toISOString()
-            })
-            .eq('id', senha.id)
-        );
-
-        // Busca informações do mikrotik
-        const mikrotikInfo = await handleSupabaseOperation(() =>
-          supabaseAdmin
-            .from('mikrotiks')
-            .select('cliente_id, profitpercentage')
-            .eq('id', venda.mikrotik_id.id)
-            .single()
-        );
-
-        // Calcula comissões
-        let porcentagemAdmin = mikrotikInfo?.profitpercentage || 10;
-        if (porcentagemAdmin > 100) porcentagemAdmin = 100;
-        if (porcentagemAdmin < 0) porcentagemAdmin = 0;
-        
-        const comissaoAdmin = venda.preco * (porcentagemAdmin / 100);
-        const comissaoDono = venda.preco - comissaoAdmin;
-
-        // Atualiza saldos
-        await supabaseAdmin.rpc('incrementar_saldo_admin', { valor: comissaoAdmin });
-        
-        if (mikrotikInfo?.cliente_id) {
-          await supabaseAdmin.rpc('incrementar_saldo_cliente', { 
-            cliente_id: mikrotikInfo.cliente_id, 
-            valor: comissaoDono 
-          });
-        }
-
-                  // Atualiza venda - valor agora representa a parte do cliente
-          await handleSupabaseOperation(() =>
-            supabaseAdmin
-              .from('vendas')
-              .update({
-                status: 'aprovado',
-                pagamento_aprovado_em: new Date().toISOString(),
-                senha_id: senha.id,
-                lucro: comissaoAdmin,
-                valor: comissaoDono
-              })
-              .eq('id', venda.id)
-          );
-
-          // Enviar para Mikrotik automaticamente
-          try {
-            const mikrotikInfo = await handleSupabaseOperation(() =>
-              supabaseAdmin
-                .from('mikrotiks')
-                .select('webhook_url')
-                .eq('id', venda.mikrotik_id.id)
-                .single()
-            );
-
-            if (mikrotikInfo?.webhook_url) {
-              const userData = `${senha.usuario}:${senha.senha}:${venda.mac_id.mac_address}:${venda.plano_id.duracao}`;
-              
-              await fetch(mikrotikInfo.webhook_url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain' },
-                body: userData
-              });
-
-              console.log('[WEBHOOK] Dados enviados para Mikrotik');
-            }
-          } catch (webhookError) {
-            console.log('[WEBHOOK] Erro ao enviar para Mikrotik:', webhookError);
-          }
-
-        // Atualiza MAC
-        await handleSupabaseOperation(() =>
-          supabaseAdmin
-            .from('macs')
-            .update({
-              total_gasto: (venda.mac_id.total_gasto || 0) + Number(venda.preco),
-              total_compras: (venda.mac_id.total_compras || 0) + 1,
-              ultimo_plano: venda.plano_id.nome,
-              ultimo_valor: venda.preco,
-              ultimo_acesso: new Date().toISOString(),
-              status_pagamento: 'aprovado',
-              pagamento_aprovado_em: new Date().toISOString()
-            })
-            .eq('id', venda.mac_id.id)
-        );
-
-        console.log('[POLL-PAYMENT] Pagamento processado com sucesso');
-
-        return res.json({
-          status: 'approved',
-          payment_status: 'approved',
-          username: senha.usuario,
-          password: senha.senha,
-          plano: venda.plano_id.nome,
-          duracao: venda.plano_id.duracao || 60,
-          message: 'Pagamento aprovado e processado com sucesso'
-        });
-      }
-
-      // Retorna o status atual
-      return res.json({
-        status: 'pending',
-        payment_status: mpData.status,
-        status_detail: mpData.status_detail,
-        message: 'Pagamento ainda não foi aprovado'
-      });
-
-    } catch (mpError) {
-      console.error('[POLL-PAYMENT] Erro ao consultar Mercado Pago:', mpError);
-      return res.status(500).json({
-        error: 'Erro ao verificar status do pagamento',
-        code: 'MERCADOPAGO_ERROR',
-        details: mpError.message
-      });
-    }
+    // Retorna status pendente
+    return res.json({
+      status: 'pending',
+      payment_status: venda.status || 'pending',
+      message: 'Pagamento ainda não foi aprovado'
+    });
 
   } catch (err) {
     next(err);
@@ -1252,17 +1096,17 @@ app.post('/api/webhook/mercadopago', async (req, res, next) => {
     
     // Processa a notificação de forma assíncrona
     // Mercado Pago pode enviar em diferentes formatos
-    const { id, topic, type, action, data } = req.body;
+    const { id, topic, type, action, data, resource } = req.body;
     
     // Também verifica query params (Mercado Pago às vezes envia assim)
     const queryId = req.query.id || req.query['data.id'];
     const queryTopic = req.query.topic;
     
-    // Determina o payment ID e topic
+    // Determina o payment ID e topic - prioriza data.id sobre id para evitar confusão
     const paymentTopic = topic || type || queryTopic;
-    const paymentId = id || data?.id || queryId;
+    const paymentId = data?.id || resource || queryId || id;
     
-    console.log('[WEBHOOK MP] Processando:', { paymentTopic, paymentId });
+    console.log('[WEBHOOK MP] Processando:', { paymentTopic, paymentId, originalBody: req.body });
     
     // Verifica se é uma notificação de pagamento
     if ((paymentTopic === 'payment' || paymentTopic === 'merchant_order') && paymentId) {
@@ -1396,33 +1240,6 @@ app.post('/api/webhook/mercadopago', async (req, res, next) => {
             
             console.log(`[WEBHOOK MP] Pagamento ${paymentId} processado com sucesso!`);
             console.log(`[WEBHOOK MP] Senha entregue: ${senha.usuario}`);
-            
-            // Se houver webhook do mikrotik configurado, envia os dados
-            try {
-              // Busca webhook do mikrotik se existir
-              const mikrotikData = await handleSupabaseOperation(() =>
-                supabaseAdmin
-                  .from('mikrotiks')
-                  .select('webhook_url')
-                  .eq('id', venda.mikrotik_id.id)
-                  .single()
-              );
-              
-              if (mikrotikData?.webhook_url) {
-                const userData = `${senha.usuario}:${senha.senha}:${venda.mac_id.mac_address}:${venda.plano_id.duracao}`;
-                
-                await fetch(mikrotikData.webhook_url, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'text/plain' },
-                  body: userData
-                });
-                
-                console.log('[WEBHOOK MP] Dados enviados para Mikrotik via webhook');
-              }
-                      } catch (webhookError) {
-            // Ignora erro de webhook do mikrotik
-            console.log('[WEBHOOK MP] Mikrotik sem webhook configurado ou erro ao enviar');
-          }
         } else {
           console.log(`[WEBHOOK MP] Pagamento ${paymentId} com status: ${mpData.status}`);
         }
@@ -1665,152 +1482,7 @@ if (process.env.APP_MODE !== 'frontend') {
   });
 }
 
-// Função para verificar pagamentos pendentes automaticamente
-async function verificarPagamentosPendentes() {
-  try {
-    console.log('[AUTO-CHECK] Verificando pagamentos pendentes...');
-    
-    // Busca vendas pendentes dos últimos 10 minutos
-    const agora = new Date();
-    const dezMinutosAtras = new Date(agora.getTime() - 10 * 60 * 1000);
-    
-    const vendasPendentes = await handleSupabaseOperation(() =>
-      supabaseAdmin
-        .from('vendas')
-        .select('*, mac_id(*), plano_id(*), mikrotik_id(*)')
-        .in('status', ['aguardando', 'pendente'])
-        .gte('pagamento_gerado_em', dezMinutosAtras.toISOString())
-        .not('payment_id', 'is', null)
-    );
-    
-    if (!vendasPendentes || vendasPendentes.length === 0) {
-      console.log('[AUTO-CHECK] Nenhum pagamento pendente encontrado');
-      return;
-    }
-    
-    console.log(`[AUTO-CHECK] ${vendasPendentes.length} pagamento(s) pendente(s) encontrado(s)`);
-    
-    // Verifica cada pagamento pendente
-    for (const venda of vendasPendentes) {
-      try {
-        console.log(`[AUTO-CHECK] Verificando pagamento ${venda.payment_id}...`);
-        
-        const mpData = await handleMercadoPagoFetch(`https://api.mercadopago.com/v1/payments/${venda.payment_id}`);
-        
-        console.log(`[AUTO-CHECK] Status do pagamento ${venda.payment_id}: ${mpData.status}`);
-        
-        // Se o pagamento foi aprovado
-        if (mpData.status === 'approved') {
-          console.log(`[AUTO-CHECK] Pagamento ${venda.payment_id} aprovado! Processando...`);
-          
-          // Busca senha disponível
-          let senha = null;
-          try {
-            const senhasDisponiveis = await handleSupabaseOperation(() =>
-              supabaseAdmin
-                .from('senhas')
-                .select('*')
-                .eq('plano_id', venda.plano_id.id)
-                .eq('vendida', false)
-                .limit(1)
-            );
-            
-            if (senhasDisponiveis && senhasDisponiveis.length > 0) {
-              senha = senhasDisponiveis[0];
-            }
-          } catch (err) {
-            console.error(`[AUTO-CHECK] Erro ao buscar senhas:`, err);
-          }
-          
-          if (!senha) {
-            console.error(`[AUTO-CHECK] Sem senhas disponíveis para o plano ${venda.plano_id.id} (${venda.plano_id.nome})`);
-            continue;
-          }
-          
-          // Marca senha como vendida
-          await handleSupabaseOperation(() =>
-            supabaseAdmin
-              .from('senhas')
-              .update({ 
-                vendida: true,
-                vendida_em: new Date().toISOString()
-              })
-              .eq('id', senha.id)
-          );
-          
-          // Busca informações do mikrotik
-          const mikrotikInfo = await handleSupabaseOperation(() =>
-            supabaseAdmin
-              .from('mikrotiks')
-              .select('cliente_id, profitpercentage')
-              .eq('id', venda.mikrotik_id.id)
-              .single()
-          );
-          
-          // Calcula comissões
-          let porcentagemAdmin = mikrotikInfo?.profitpercentage || 10;
-          if (porcentagemAdmin > 100) porcentagemAdmin = 100;
-          if (porcentagemAdmin < 0) porcentagemAdmin = 0;
-          
-          const comissaoAdmin = venda.preco * (porcentagemAdmin / 100);
-          const comissaoDono = venda.preco - comissaoAdmin;
-          
-          // Atualiza saldos
-          await supabaseAdmin.rpc('incrementar_saldo_admin', { valor: comissaoAdmin });
-          
-          if (mikrotikInfo?.cliente_id) {
-            await supabaseAdmin.rpc('incrementar_saldo_cliente', { 
-              cliente_id: mikrotikInfo.cliente_id, 
-              valor: comissaoDono 
-            });
-          }
-          
-          // Atualiza venda
-          await handleSupabaseOperation(() =>
-            supabaseAdmin
-              .from('vendas')
-              .update({
-                status: 'aprovado',
-                pagamento_aprovado_em: new Date().toISOString(),
-                senha_id: senha.id,
-                lucro: comissaoAdmin,
-                valor: comissaoDono
-              })
-              .eq('id', venda.id)
-          );
-          
-          // Log de sucesso (webhook removido temporariamente)
-          console.log('[AUTO-CHECK] Senha atribuída com sucesso');
-          
-          // Atualiza MAC
-          await handleSupabaseOperation(() =>
-            supabaseAdmin
-              .from('macs')
-              .update({
-                total_gasto: (venda.mac_id.total_gasto || 0) + Number(venda.preco),
-                total_compras: (venda.mac_id.total_compras || 0) + 1,
-                ultimo_plano: venda.plano_id.nome,
-                ultimo_valor: venda.preco,
-                ultimo_acesso: new Date().toISOString(),
-                status_pagamento: 'aprovado',
-                pagamento_aprovado_em: new Date().toISOString()
-              })
-              .eq('id', venda.mac_id.id)
-          );
-          
-          console.log(`[AUTO-CHECK] Pagamento ${venda.payment_id} processado com sucesso!`);
-          console.log(`[AUTO-CHECK] Senha entregue: ${senha.usuario}`);
-        }
-        
-      } catch (error) {
-        console.error(`[AUTO-CHECK] Erro ao verificar pagamento ${venda.payment_id}:`, error);
-      }
-    }
-    
-  } catch (error) {
-    console.error('[AUTO-CHECK] Erro na verificação automática:', error);
-  }
-}
+
 
 // Porta
 const port = process.env.PORT || 3000;
@@ -1824,10 +1496,6 @@ app.listen(port, () => {
     console.log(`Frontend disponível em: http://localhost:${process.env.FRONTEND_PORT || 5173}/`);
   }
   
-  // Inicia verificação automática de pagamentos a cada 30 segundos
-  console.log('[AUTO-CHECK] Iniciando verificação automática de pagamentos...');
-  setInterval(verificarPagamentosPendentes, 30000); // 30 segundos
-  
-  // Executa primeira verificação após 5 segundos
-  setTimeout(verificarPagamentosPendentes, 5000);
+  // Sistema de polling removido - usando apenas webhook do Mercado Pago
+  console.log('[WEBHOOK MP] Sistema configurado para usar apenas webhook do Mercado Pago');
 }); 
