@@ -680,15 +680,13 @@
     </style>
 </head>
 <body>
-    <!-- MikroTik CHAP Authentication Support -->
-    $(if chap-id)
-        <form name="sendin" action="$(link-login-only)" method="post" class="mikrotik-form">
-            <input type="hidden" name="username" />
-            <input type="hidden" name="password" />
-            <input type="hidden" name="dst" value="$(link-orig)" />
-            <input type="hidden" name="popup" value="true" />
-        </form>
-    $(endif)
+    <!-- MikroTik CHAP Authentication Support - Hidden Form -->
+    <form name="mikrotikSendin" action="" method="post" style="display:none" class="mikrotik-form">
+        <input type="hidden" name="username" />
+        <input type="hidden" name="password" />
+        <input type="hidden" name="dst" value="" />
+        <input type="hidden" name="popup" value="true" />
+    </form>
 
     <!-- Animated Background -->
     <div class="bg-animation">
@@ -995,7 +993,7 @@
         // Detect environment and initialize
         function detectEnvironment() {
             // Check if we're running on MikroTik by checking if variables are processed
-            const chapId = '$(chap-id)';
+            const chapId = '';
             const linkLogin = '$(link-login-only)';
             
             // If variables still contain $( they weren't processed by MikroTik
@@ -1219,12 +1217,9 @@
             }
 
             try {
-                const response = await fetch(state.apiUrl + '/planos', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        mikrotik_id: state.mikrotikId
-                    })
+                const response = await fetch(state.apiUrl + '/api/planos/' + state.mikrotikId, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
                 });
                 
                 if (!response.ok) {
@@ -1408,7 +1403,7 @@
             showLoading('Gerando PIX...', 'Criando seu pagamento personalizado');
 
             try {
-                const response = await fetch(state.apiUrl + '/pix', {
+                const response = await fetch(state.apiUrl + '/api/pix', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1498,7 +1493,7 @@
             if (!state.paymentId || !state.apiUrl) return;
             
             try {
-                const response = await fetch(state.apiUrl + '/poll-payment', {
+                const response = await fetch(state.apiUrl + '/api/poll-payment', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
