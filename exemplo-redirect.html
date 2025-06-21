@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exemplo - Redirect com Variáveis MikroTik</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .example {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border-left: 4px solid #007bff;
+        }
+        .code {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background: #f8f9fa;
+            font-weight: bold;
+        }
+        .btn {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin: 5px;
+        }
+        .btn:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔗 Como Usar o Redirect.html</h1>
+        
+        <div class="success">
+            <strong>✅ Arquivo criado:</strong> <code>backend/redirect.html</code><br>
+            Este arquivo carrega o template via iframe com cache-busting automático.
+        </div>
+
+        <h2>📋 Parâmetros Necessários</h2>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Parâmetro</th>
+                    <th>Descrição</th>
+                    <th>Obrigatório</th>
+                    <th>Exemplo</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>api_url</code></td>
+                    <td>URL da sua API backend</td>
+                    <td>✅ Sim</td>
+                    <td>http://localhost:3000</td>
+                </tr>
+                <tr>
+                    <td><code>mikrotik_id</code></td>
+                    <td>ID do MikroTik na sua base</td>
+                    <td>✅ Sim</td>
+                    <td>1, 2, 3...</td>
+                </tr>
+                <tr>
+                    <td><code>mac</code></td>
+                    <td>MAC do cliente (MikroTik)</td>
+                    <td>✅ Sim</td>
+                    <td>AA:BB:CC:DD:EE:FF</td>
+                </tr>
+                <tr>
+                    <td><code>ip</code></td>
+                    <td>IP do cliente (MikroTik)</td>
+                    <td>❌ Não</td>
+                    <td>192.168.1.100</td>
+                </tr>
+                <tr>
+                    <td><code>debug</code></td>
+                    <td>Ativar modo debug</td>
+                    <td>❌ Não</td>
+                    <td>1 ou true</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>🎯 Exemplo 1: Uso no MikroTik</h2>
+        
+        <div class="example">
+            <strong>Cenário:</strong> Configurar como página de login do hotspot MikroTik
+        </div>
+
+        <p>No MikroTik, configure o redirect.html como página de login:</p>
+        
+        <div class="code">
+/ip hotspot walled-garden
+add dst-host=seudominio.com
+add dst-host=localhost
+
+/ip hotspot profile
+set hsprof1 login-by=http-chap,http-pap
+set hsprof1 html-directory=hotspot
+set hsprof1 http-proxy=0.0.0.0:0
+
+# Configure a página de login
+# Copie redirect.html para: /hotspot/login.html
+        </div>
+
+        <p>URL que o MikroTik irá chamar automaticamente:</p>
+        <div class="code">
+http://seudominio.com/redirect.html?api_url=http://localhost:3000&mikrotik_id=1
+        </div>
+
+        <div class="warning">
+            <strong>⚠️ Importante:</strong> As variáveis MikroTik como $(mac), $(ip), etc. são automaticamente processadas quando servidas pelo próprio MikroTik.
+        </div>
+
+        <h2>🎯 Exemplo 2: Teste via Navegador</h2>
+        
+        <div class="example">
+            <strong>Cenário:</strong> Testar o redirect com parâmetros manuais
+        </div>
+
+        <p>URL para teste (substitua pelos seus valores):</p>
+        <div class="code">
+http://localhost:3000/redirect.html?api_url=http://localhost:3000&mikrotik_id=1&mac=AA:BB:CC:DD:EE:FF&ip=192.168.1.100&debug=1
+        </div>
+
+        <h2>🎯 Exemplo 3: URL Completa com Todos Parâmetros</h2>
+        
+        <div class="code">
+http://localhost:3000/redirect.html?api_url=http://localhost:3000&mikrotik_id=1&mac=AA:BB:CC:DD:EE:FF&ip=192.168.1.100&interface=bridge1&link-login=http://192.168.1.1:8080/login&link-orig=http://google.com&debug=1
+        </div>
+
+        <h2>🔧 Funcionalidades</h2>
+        
+        <ul>
+            <li>✅ <strong>Cache Busting:</strong> Adiciona parâmetros únicos para evitar cache</li>
+            <li>✅ <strong>Loading Screen:</strong> Tela de carregamento com spinner</li>
+            <li>✅ <strong>Error Handling:</strong> Tratamento de erros com retry</li>
+            <li>✅ <strong>Debug Mode:</strong> Informações detalhadas quando debug=1</li>
+            <li>✅ <strong>Validation:</strong> Valida se dados obrigatórios estão presentes</li>
+            <li>✅ <strong>Iframe Sandbox:</strong> Segurança com sandbox</li>
+            <li>✅ <strong>Responsive:</strong> Design responsivo</li>
+        </ul>
+
+        <h2>🚀 Como Testar</h2>
+        
+        <div class="example">
+            <strong>1. Inicie sua API:</strong>
+            <div class="code">cd backend && node start-app.js</div>
+        </div>
+
+        <div class="example">
+            <strong>2. Acesse o redirect com debug:</strong>
+            <a href="http://localhost:3000/redirect.html?api_url=http://localhost:3000&mikrotik_id=1&mac=AA:BB:CC:DD:EE:FF&debug=1" class="btn" target="_blank">
+                🧪 Testar Redirect
+            </a>
+        </div>
+
+        <div class="example">
+            <strong>3. Verifique o debug info:</strong>
+            <p>Com debug=1, você verá informações detalhadas no canto inferior direito.</p>
+        </div>
+
+        <h2>📁 Estrutura de Arquivos</h2>
+        
+        <div class="code">
+backend/
+├── redirect.html          ← Página que carrega o template via iframe
+├── templates/
+│   └── 1/
+│       └── login.html     ← Template do captive portal
+├── api.cjs               ← API backend
+└── start-app.js          ← Servidor
+        </div>
+
+        <div class="success">
+            <strong>🎉 Pronto!</strong> Agora o redirect.html carrega o template via iframe, coleta o MAC do MikroTik e passa todas as variáveis necessárias para sua API funcionar corretamente.
+        </div>
+    </div>
+</body>
+</html> 

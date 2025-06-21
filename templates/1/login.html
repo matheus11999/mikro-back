@@ -1083,13 +1083,22 @@
             if (state.debug) {
                 debugDiv.innerHTML = 
                     '<strong>DEBUG INFO:</strong><br>' +
+                    '<strong>Environment:</strong> ' + (state.isMikroTikEnvironment ? 'MikroTik' : 'External API') + '<br>' +
+                    '<strong>MikroTik Data:</strong><br>' +
                     'MAC: ' + (state.mac || 'N/A') + '<br>' +
                     'IP: ' + (state.ip || 'N/A') + '<br>' +
                     'Interface: ' + (state.interface || 'N/A') + '<br>' +
-                    'Mikrotik ID: ' + (state.mikrotikId || 'N/A') + '<br>' +
-                    'API URL: ' + (state.apiUrl || 'N/A') + '<br>' +
                     'Link Login: ' + (state.linkLogin || 'N/A') + '<br>' +
-                    'Link Orig: ' + (state.linkOrig || 'N/A');
+                    'Link Orig: ' + (state.linkOrig || 'N/A') + '<br>' +
+                    '<strong>API Config:</strong><br>' +
+                    'MikroTik ID: ' + (state.mikrotikId || 'N/A') + '<br>' +
+                    'API URL: ' + (state.apiUrl || 'N/A') + '<br>' +
+                    '<strong>Additional:</strong><br>' +
+                    'CHAP ID: ' + (state.chapId || 'N/A') + '<br>' +
+                    'Trial: ' + (state.trial || 'N/A') + '<br>' +
+                    'Error: ' + (state.error || 'N/A') + '<br>' +
+                    'Username: ' + (state.username || 'N/A') + '<br>' +
+                    'Time: ' + new Date().toLocaleTimeString();
                 debugDiv.classList.add('show');
             } else {
                 debugDiv.classList.remove('show');
@@ -1101,21 +1110,57 @@
             const urlParams = new URLSearchParams(window.location.search);
             
             // Get MikroTik data from URL parameters
-            state.mac = urlParams.get('mac');
-            state.ip = urlParams.get('ip');
-            state.interface = urlParams.get('interface');
-            state.linkOrig = urlParams.get('link-orig');
-            state.linkLogin = urlParams.get('link-login');
+            state.mac = urlParams.get('mac') || null;
+            state.ip = urlParams.get('ip') || null;
+            state.interface = urlParams.get('interface') || urlParams.get('interface-name') || null;
+            state.linkOrig = urlParams.get('link-orig') || urlParams.get('linkOrig') || null;
+            state.linkLogin = urlParams.get('link-login') || urlParams.get('linkLogin') || null;
             
             // Get configuration data
-            state.mikrotikId = urlParams.get('mikrotik_id');
-            state.apiUrl = urlParams.get('api_url');
-            state.debug = urlParams.get('debug') === 'true';
+            state.mikrotikId = urlParams.get('mikrotik_id') || null;
+            state.apiUrl = urlParams.get('api_url') || null;
+            state.debug = urlParams.get('debug') === 'true' || urlParams.get('debug') === '1';
+
+            // Get additional MikroTik variables if present
+            const chapId = urlParams.get('chap-id') || urlParams.get('chapId') || null;
+            const trial = urlParams.get('trial') || null;
+            const error = urlParams.get('error') || null;
+            const username = urlParams.get('username') || null;
+
+            // Store additional data
+            if (chapId) state.chapId = chapId;
+            if (trial) state.trial = trial;
+            if (error) state.error = error;
+            if (username) state.username = username;
+
+            // Notify parent window that template is ready (for iframe communication)
+            try {
+                if (window.parent && window.parent !== window) {
+                    window.parent.postMessage({
+                        type: 'template_ready',
+                        data: {
+                            mac: state.mac,
+                            mikrotikId: state.mikrotikId,
+                            apiUrl: state.apiUrl
+                        }
+                    }, '*');
+                }
+            } catch (e) {
+                console.log('Parent communication not available:', e.message);
+            }
 
             // Validate only required parameters for API functionality
             if (!state.mikrotikId || !state.apiUrl) {
-                console.warn('Parâmetros da API não fornecidos - funcionalidade limitada');
-                // Don't block the page, just log warning
+                console.warn('Parâmetros da API não fornecidos - funcionalidade PIX limitada');
+                showMessage('⚠️ Configuração da API não encontrada. Funcionalidade PIX indisponível.', 'warning', 8000);
+            }
+
+            // Validate MAC address for MikroTik functionality
+            if (!state.mac || state.mac.includes('$(')) {
+                console.warn('MAC address não encontrado - funcionalidades MikroTik limitadas');
+                if (state.debug) {
+                    showMessage('⚠️ MAC address não encontrado. Algumas funcionalidades podem não funcionar.', 'warning', 5000);
+                }
             }
 
             updateDebugInfo();
@@ -1564,6 +1609,38 @@
             }
         }
 
+        // Handle login form submission
+        function handleLoginSubmit(event) {
+            if (event) event.preventDefault();
+            
+            const usernameInput = document.getElementById('username');
+            const username = usernameInput ? usernameInput.value.trim() : '';
+            
+            if (!username) {
+                showMessage('⚠️ Por favor, digite uma senha', 'warning');
+                return false;
+            }
+            
+            // Show loading while processing
+            showLoading('Verificando senha...', 'Aguarde um momento');
+            
+            // Small delay for better UX
+            setTimeout(() => {
+                hideLoading();
+                
+                if (state.isMikroTikEnvironment) {
+                    // Let MikroTik handle the login
+                    return doLogin();
+                } else {
+                    // For external API, just show message
+                    showMessage('✅ Senha inserida: ' + username, 'success');
+                    console.log('Login attempt with username:', username);
+                }
+            }, 1000);
+            
+            return false;
+        }
+
         // Initialize everything when page loads
         document.addEventListener('DOMContentLoaded', function() {
             console.log('DOM loaded - initializing...');
@@ -1571,15 +1648,34 @@
             // Detect environment and initialize accordingly
             detectEnvironment();
             
+            // Show error message if present in URL
+            if (state.error) {
+                showMessage('❌ Erro: ' + state.error, 'error', 10000);
+            }
+            
             // Focus on username input (MikroTik style)
             setTimeout(() => {
                 const usernameInput = document.getElementById('username');
                 if (usernameInput) {
                     usernameInput.focus();
+                    
+                    // Add enter key handler
+                    usernameInput.addEventListener('keypress', function(e) {
+                        if (e.key === 'Enter') {
+                            handleLoginSubmit(e);
+                        }
+                    });
                 }
+                
                 // Also try the form reference
                 if (document.login && document.login.username) {
                     document.login.username.focus();
+                }
+                
+                // Setup form submission handler
+                const loginForm = document.login || document.querySelector('form[name="login"]');
+                if (loginForm) {
+                    loginForm.addEventListener('submit', handleLoginSubmit);
                 }
             }, 100);
             
