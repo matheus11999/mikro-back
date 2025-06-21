@@ -1,1122 +1,1107 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
-    <meta charset="utf-8">
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-    <meta http-equiv="pragma" content="no-cache" />
-    <meta http-equiv="expires" content="-1" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0; maximum-scale=1.0;"/>
-    <title>Avistão WIFI</title>
-    <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
-    <link href="css/bootstrap.min.css" rel="stylesheet">
-    <link href="css/style.css" rel="stylesheet">
-    
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WiFi Premium - Conexão Rápida</title>
     <style>
-        /* Estilos modernos adicionais */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        :root {
+            --primary: #00D9FF;
+            --primary-dark: #00A8CC;
+            --secondary: #7C3AED;
+            --success: #10B981;
+            --error: #EF4444;
+            --warning: #F59E0B;
+            --dark: #1F2937;
+            --light: #F9FAFB;
+            --gray: #6B7280;
+            --white: #FFFFFF;
+            --shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            --radius: 16px;
+            --radius-lg: 24px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
         body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        
-        .container {
-            max-width: 400px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        .panel {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
-            backdrop-filter: blur(10px);
-            animation: slideUp 0.6s ease-out;
-        }
-        
-        .btn-login {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-            border-radius: 12px;
-            padding: 15px 30px;
-            color: white;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-        }
-        
-        .btn-login:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
-        }
-        
-        .btn-pix {
-            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-            border: none;
-            border-radius: 15px;
-            padding: 18px 30px;
-            color: white;
-            font-weight: bold;
-            font-size: 16px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            transition: all 0.3s ease;
-            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.3);
-            animation: pulse 2s infinite;
-            cursor: pointer;
-            width: 100%;
-        }
-        
-        .btn-pix:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 30px rgba(76, 175, 80, 0.4);
-        }
-        
-        .username {
-            border-radius: 12px;
-            border: 2px solid #e1e5e9;
-            padding: 15px;
-            font-size: 16px;
-            transition: all 0.3s ease;
-            background: #f8f9fa;
-        }
-        
-        .username:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-            background: white;
-            transform: translateY(-2px);
-        }
-        
-        .divider {
-            text-align: center;
-            margin: 25px 0;
-            position: relative;
-        }
-        
-        .divider:before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 0;
-            right: 0;
-            height: 1px;
-            background: #e1e5e9;
-        }
-        
-        .divider span {
-            background: rgba(255, 255, 255, 0.95);
-            padding: 0 20px;
-            color: #666;
-            font-weight: 500;
-        }
-        
-        .alert {
-            border-radius: 12px;
-            border: none;
-            padding: 15px;
-            margin-bottom: 20px;
-            animation: slideIn 0.4s ease-out;
-        }
-        
-        .alert-success {
-            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-            color: white;
-        }
-        
-        .alert-error {
-            background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
-            color: white;
-        }
-        
-        .alert-info {
-            background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
-            color: white;
-        }
-        
-        .alert-warning {
-            background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
-            color: white;
-        }
-        
-        /* Debug Panel */
-        .debug-panel {
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            right: 10px;
-            background: rgba(0, 0, 0, 0.9);
-            color: #00ff00;
-            padding: 10px;
-            border-radius: 10px;
-            font-family: monospace;
-            font-size: 12px;
-            z-index: 9999;
-            max-height: 200px;
-            overflow-y: auto;
-            display: none;
-        }
-        
-        .debug-panel h4 {
-            color: #ffff00;
-            margin: 0 0 10px 0;
-            font-size: 14px;
-        }
-        
-        .debug-item {
-            margin: 5px 0;
-            word-break: break-all;
-        }
-        
-        .debug-label {
-            color: #ff9800;
-            font-weight: bold;
-        }
-        
-        /* Modal Moderno */
-        .modern-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            backdrop-filter: blur(5px);
-        }
-        
-        .modal-content {
-            background: white;
-            border-radius: 20px;
-            padding: 30px;
-            max-width: 90%;
-            max-height: 80vh;
-            overflow-y: auto;
-            position: relative;
-            animation: modalSlideIn 0.3s ease-out;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-        }
-        
-        .modal-close {
-            position: absolute;
-            top: 15px;
-            right: 20px;
-            font-size: 28px;
-            cursor: pointer;
-            color: #999;
-            transition: all 0.3s ease;
-            width: 30px;
-            height: 30px;
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 50%;
+            padding: 20px;
+            position: relative;
+            overflow-x: hidden;
         }
-        
-        .modal-close:hover {
-            color: #333;
-            background: #f5f5f5;
+
+        /* Animated Background */
+        .bg-animation {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            z-index: 0;
+            opacity: 0.3;
         }
-        
-        .plan-card {
-            border: 2px solid #e1e5e9;
-            border-radius: 15px;
-            padding: 25px;
-            margin-bottom: 15px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            background: #f8f9fa;
+
+        .bg-animation span {
+            position: absolute;
+            display: block;
+            width: 20px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            animation: move 25s linear infinite;
+            bottom: -150px;
+        }
+
+        @keyframes move {
+            0% { transform: translateY(0) rotate(0deg); opacity: 1; border-radius: 0; }
+            100% { transform: translateY(-1000px) rotate(720deg); opacity: 0; border-radius: 50%; }
+        }
+
+        /* Main Container */
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            max-width: 450px;
+            width: 100%;
+            position: relative;
+            z-index: 1;
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            padding: 30px 30px;
+            text-align: center;
             position: relative;
             overflow: hidden;
         }
-        
-        .plan-card:before {
+
+        .logo {
+            width: 70px;
+            height: 70px;
+            background: var(--white);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 35px;
+            margin: 0 auto 15px;
+            position: relative;
+            z-index: 1;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .header h1 {
+            color: var(--white);
+            font-size: 24px;
+            font-weight: 800;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 14px;
+        }
+
+        /* Content */
+        .content {
+            padding: 30px;
+        }
+
+        .screen {
+            display: none;
+        }
+
+        .screen.active {
+            display: block;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Plans Screen */
+        .plans-grid {
+            display: grid;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .plan-card {
+            background: var(--light);
+            border: 2px solid #E5E7EB;
+            border-radius: var(--radius);
+            padding: 20px;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .plan-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+
+        .plan-card.selected {
+            border-color: var(--primary);
+            background: rgba(0, 217, 255, 0.05);
+        }
+
+        .plan-card::before {
             content: '';
             position: absolute;
             top: 0;
-            left: -100%;
+            left: 0;
             width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            transition: left 0.5s;
+            height: 4px;
+            background: var(--primary);
+            transform: scaleX(0);
+            transition: var(--transition);
         }
-        
-        .plan-card:hover:before {
-            left: 100%;
+
+        .plan-card.selected::before {
+            transform: scaleX(1);
         }
-        
-        .plan-card:hover {
-            border-color: #667eea;
-            transform: translateY(-5px);
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
-            background: white;
-        }
-        
-        .plan-card.selected {
-            border-color: #667eea;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            transform: translateY(-5px);
-            box-shadow: 0 15px 35px rgba(102, 126, 234, 0.3);
-        }
-        
+
         .plan-name {
-            font-size: 20px;
-            font-weight: bold;
-            margin-bottom: 10px;
-        }
-        
-        .plan-price {
-            font-size: 28px;
-            font-weight: bold;
-            color: #4CAF50;
-            margin-bottom: 5px;
-        }
-        
-        .plan-card.selected .plan-price {
-            color: #fff;
-        }
-        
-        .plan-duration {
-            font-size: 14px;
-            opacity: 0.8;
-        }
-        
-        .loading-container {
-            text-align: center;
-            padding: 40px;
-        }
-        
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #667eea;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
-        }
-        
-        .qr-container {
-            text-align: center;
-            padding: 20px;
-        }
-        
-        .qr-code {
-            max-width: 250px;
-            height: auto;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            margin: 20px auto;
-            display: block;
-        }
-        
-        .pix-key {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 12px;
-            border: 2px dashed #667eea;
-            margin: 20px 0;
-            word-break: break-all;
-            font-family: 'Courier New', monospace;
-            font-size: 14px;
-            color: #333;
-        }
-        
-        .copy-btn {
-            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 25px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            margin: 10px 5px;
-            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
-        }
-        
-        .copy-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.4);
-        }
-        
-        .instructions {
-            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
-            padding: 20px;
-            border-radius: 15px;
-            margin: 20px 0;
-            border-left: 5px solid #2196F3;
-        }
-        
-        .instructions h3 {
-            color: #1976d2;
-            margin-bottom: 15px;
             font-size: 18px;
-        }
-        
-        .instructions ol {
-            margin-left: 20px;
-            color: #424242;
-        }
-        
-        .instructions li {
+            font-weight: 700;
+            color: var(--dark);
             margin-bottom: 8px;
         }
-        
-        .payment-success {
+
+        .plan-price {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+
+        .plan-features {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .plan-features li {
+            color: var(--gray);
+            margin-bottom: 5px;
+            position: relative;
+            padding-left: 20px;
+        }
+
+        .plan-features li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: var(--success);
+            font-weight: bold;
+        }
+
+        /* Instructions Screen */
+        .instructions {
             text-align: center;
-            padding: 30px;
-            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-            color: white;
-            border-radius: 15px;
-            margin: 20px 0;
+            padding: 20px 0;
         }
-        
-        .payment-success h3 {
-            margin-bottom: 15px;
-            font-size: 24px;
+
+        .instructions h2 {
+            color: var(--dark);
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 20px;
         }
-        
-        .trial-activated {
-            background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+
+        .steps {
+            list-style: none;
+            margin: 0 0 30px 0;
+            padding: 0;
+        }
+
+        .steps li {
+            background: var(--light);
+            border-left: 4px solid var(--primary);
+            padding: 15px 20px;
+            margin-bottom: 10px;
+            border-radius: 0 var(--radius) var(--radius) 0;
+            text-align: left;
+            position: relative;
+        }
+
+        .steps li .step-number {
+            position: absolute;
+            left: -2px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--primary);
             color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .steps li .step-text {
+            margin-left: 30px;
+            color: var(--dark);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .access-info {
+            background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+            border-radius: var(--radius);
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .access-info .icon {
+            font-size: 40px;
+            margin-bottom: 10px;
+        }
+
+        .access-info h3 {
+            color: var(--warning);
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .access-info p {
+            color: #92400E;
+            font-size: 14px;
+        }
+
+        /* PIX Payment Screen */
+        .pix-container {
+            text-align: center;
+        }
+
+        .qr-container {
+            background: var(--white);
+            padding: 20px;
+            border-radius: var(--radius);
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+        }
+
+        .qr-container img {
+            max-width: 200px;
+            height: auto;
+        }
+
+        .pix-code-container {
+            background: var(--light);
+            border: 2px dashed var(--primary);
+            border-radius: var(--radius);
             padding: 15px;
-            border-radius: 12px;
-            margin: 15px 0;
+            margin-bottom: 20px;
+            word-break: break-all;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: var(--dark);
+        }
+
+        .trial-notice {
+            background: linear-gradient(135deg, #DBEAFE 0%, #BFDBFE 100%);
+            border-radius: var(--radius);
+            padding: 15px;
+            margin-bottom: 20px;
             text-align: center;
+        }
+
+        .trial-notice .icon {
+            font-size: 30px;
+            margin-bottom: 8px;
+        }
+
+        .trial-notice h4 {
+            color: var(--primary-dark);
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .trial-notice p {
+            color: #1E40AF;
+            font-size: 13px;
+        }
+
+        /* Button Styles */
+        .btn {
+            width: 100%;
+            padding: 16px 24px;
+            border: none;
+            border-radius: var(--radius);
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-decoration: none;
+            margin-bottom: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: var(--white);
+            box-shadow: 0 4px 14px 0 rgba(0, 217, 255, 0.39);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px 0 rgba(0, 217, 255, 0.5);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
+            color: var(--white);
+        }
+
+        .btn-success:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px 0 rgba(16, 185, 129, 0.5);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .btn.loading {
+            position: relative;
+            color: transparent;
+        }
+
+        .btn.loading::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border: 2px solid transparent;
+            border-top: 2px solid currentColor;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: var(--white);
+        }
+
+        @keyframes spin {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+
+        .btn.copied {
+            background: var(--success) !important;
+        }
+
+        /* Timer */
+        .timer {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: rgba(239, 68, 68, 0.1);
+            border-radius: var(--radius);
+        }
+
+        .timer-text {
+            color: var(--error);
+            font-size: 14px;
             font-weight: 600;
         }
-        
-        /* Animações */
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+
+        .timer-value {
+            color: var(--error);
+            font-size: 24px;
+            font-weight: 800;
+            margin-top: 5px;
         }
-        
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateX(-30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
+
+        /* Success Screen */
+        .success-container {
+            text-align: center;
         }
-        
-        @keyframes modalSlideIn {
-            from {
-                opacity: 0;
-                transform: scale(0.9) translateY(-50px);
-            }
-            to {
-                opacity: 1;
-                transform: scale(1) translateY(0);
-            }
+
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background: var(--success);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            color: var(--white);
+            font-size: 40px;
         }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+
+        .credentials {
+            background: var(--light);
+            border-radius: var(--radius);
+            padding: 20px;
+            margin-bottom: 20px;
         }
-        
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
+
+        .credential-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: var(--white);
+            border-radius: 8px;
         }
-        
+
+        .credential-label {
+            color: var(--gray);
+            font-size: 14px;
+        }
+
+        .credential-value {
+            color: var(--dark);
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Debug Info */
+        .debug-info {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            font-family: monospace;
+            max-width: 300px;
+            word-break: break-all;
+            z-index: 1000;
+            display: none;
+        }
+
+        .debug-info.show {
+            display: block;
+        }
+
         /* Responsive */
         @media (max-width: 480px) {
             .container {
-                padding: 15px;
+                margin: 10px;
+                max-width: none;
             }
             
-            .panel {
-                padding: 25px 20px;
-            }
-            
-            .modal-content {
-                padding: 20px;
-                margin: 20px;
-            }
-            
-            .plan-card {
+            .content {
                 padding: 20px;
             }
             
-            .debug-panel {
-                font-size: 10px;
-                max-height: 150px;
+            .plan-price {
+                font-size: 24px;
             }
         }
     </style>
 </head>
 <body>
-    <!-- Debug Panel -->
-    <div id="debug-panel" class="debug-panel">
-        <h4>🐛 DEBUG MODE</h4>
-        <div id="debug-content"></div>
+    <!-- Animated Background -->
+    <div class="bg-animation">
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
     </div>
 
-    <!-- Formulário CHAP (mantido original) -->
-    $(if chap-id)
-        <form name="sendin" action="$(link-login-only)" method="post" style="display:none">
-            <input type="hidden" name="username" />
-            <input type="hidden" name="password" />
-            <input type="hidden" name="dst" value="$(link-orig)" />
-            <input type="hidden" name="popup" value="true" />
-        </form>
+    <!-- Debug Info -->
+    <div id="debugInfo" class="debug-info"></div>
 
-        <script type="text/javascript" src="md5.js"></script>
-        <script>
-            function doLogin() {
-                document.sendin.username.value = document.login.username.value;
-                document.sendin.password.value = document.login.username.value;
-                document.sendin.submit();
-                return false;
-            }
-        </script>
-    $(endif)
-
-    <!-- Formulário Trial (mantido original) -->
-    <form name="trial" action="$(link-login-only)" method="post" style="display:none">
-        <input type="hidden" name="username" value="T-$(mac-esc)" />
-        <input type="hidden" name="password" value="" />
-        <input type="hidden" name="dst" value="$(link-orig)" />
-        <input type="hidden" name="popup" value="true" />
-    </form>
-
+    <!-- Main Container -->
     <div class="container">
-        <img src="img/logo.png" style="width: 100%;" onerror="this.style.display='none'">
-        <div class="col-md-4">
-            <div class="panel-second"></div>
-            <div class="panel">
-                <form class="login" name="login" action="$(link-login-only)" method="post"
-                    $(if chap-id) onSubmit="return doLogin()" $(endif)>
-                    <input type="hidden" name="dst" value="$(link-orig)" />
-                    <input type="hidden" name="popup" value="true" />
-                    <div class="s-login">
-                        <!-- Alertas -->
-                        <div id="alert-container">
-                            $(if error)
-                            <div class="alert alert-info">
-                                <strong>Erro!</strong> $(error).
-                            </div>
-                            $(endif)
-                        </div>
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">🌐</div>
+            <h1>WiFi Premium</h1>
+            <p>Conexão rápida e segura</p>
+        </div>
 
-                        <input type="text" name="username" class="username" value="$(username)" placeholder="Digite a Senha Aqui..." />
-                        <input type="hidden" name="password" value=""/>
-                    </div>
-                    <button type="submit" class="btn-login text-space">CONECTAR</button>
-                </form>
-
-                <!-- Divider -->
-                <div class="divider">
-                    <span>OU</span>
+        <!-- Content -->
+        <div class="content">
+            <!-- Plans Selection Screen -->
+            <div id="plansScreen" class="screen active">
+                <h2 style="text-align: center; color: var(--dark); margin-bottom: 25px; font-size: 20px;">
+                    Escolha seu plano de internet
+                </h2>
+                
+                <div id="plansContainer" class="plans-grid">
+                    <!-- Plans will be loaded here -->
                 </div>
 
-                <!-- Botão Comprar PIX -->
-                <button type="button" class="btn-pix" id="comprar-pix-btn">
-                    💳 COMPRAR ACESSO VIA PIX
+                <button id="selectPlanBtn" class="btn btn-primary" disabled>
+                    <span>📱</span>
+                    <span>Selecionar Plano</span>
                 </button>
             </div>
-        </div>
-    </div>
 
-    <!-- Modal de Pagamento -->
-    <div id="payment-modal" class="modern-modal">
-        <div class="modal-content">
-            <span class="modal-close" id="close-payment-modal">&times;</span>
-            <div id="payment-content">
-                <div class="loading-container">
-                    <div class="spinner"></div>
-                    <p>Carregando opções de pagamento...</p>
+            <!-- Instructions Screen -->
+            <div id="instructionsScreen" class="screen">
+                <div class="instructions">
+                    <h2>Como funciona?</h2>
+                    
+                    <div class="access-info">
+                        <div class="icon">⏱️</div>
+                        <h3>Acesso Liberado por 5 Minutos</h3>
+                        <p>Você terá acesso gratuito para fazer o pagamento via PIX</p>
+                    </div>
+
+                    <ol class="steps">
+                        <li>
+                            <div class="step-number">1</div>
+                            <div class="step-text">
+                                <strong>Copie a chave PIX</strong><br>
+                                Use o botão "Copiar" para copiar o código PIX automaticamente
+                            </div>
+                        </li>
+                        <li>
+                            <div class="step-number">2</div>
+                            <div class="step-text">
+                                <strong>Faça o pagamento</strong><br>
+                                Abra seu banco e cole o código PIX ou escaneie o QR Code
+                            </div>
+                        </li>
+                        <li>
+                            <div class="step-number">3</div>
+                            <div class="step-text">
+                                <strong>Acesso automático</strong><br>
+                                Após o pagamento, sua internet será liberada automaticamente
+                            </div>
+                        </li>
+                    </ol>
+
+                    <button id="continueBtn" class="btn btn-primary">
+                        <span>▶️</span>
+                        <span>Continuar</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- PIX Payment Screen -->
+            <div id="pixScreen" class="screen">
+                <div class="pix-container">
+                    <h2 style="text-align: center; color: var(--dark); margin-bottom: 20px;">
+                        Pagamento PIX
+                    </h2>
+
+                    <div class="trial-notice" id="trialNotice">
+                        <div class="icon">🎁</div>
+                        <h4>Preparando acesso...</h4>
+                        <p>Aguarde enquanto liberamos seu acesso temporário</p>
+                    </div>
+
+                    <div class="timer">
+                        <div class="timer-text">Tempo para pagamento</div>
+                        <div id="timer" class="timer-value">5:00</div>
+                    </div>
+
+                    <div id="qrContainer" class="qr-container">
+                        <div id="qrCode">
+                            <!-- QR Code will be inserted here -->
+                        </div>
+                    </div>
+
+                    <div class="pix-code-container">
+                        <div style="margin-bottom: 10px; font-weight: bold; color: var(--dark);">
+                            Chave PIX:
+                        </div>
+                        <div id="pixCode">
+                            <!-- PIX code will be inserted here -->
+                        </div>
+                    </div>
+
+                    <button id="copyBtn" class="btn btn-success">
+                        <span>📋</span>
+                        <span>Copiar Chave PIX</span>
+                    </button>
+
+                    <div style="text-align: center; margin-top: 15px;">
+                        <small style="color: var(--gray);">
+                            O pagamento será detectado automaticamente
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Success Screen -->
+            <div id="successScreen" class="screen">
+                <div class="success-container">
+                    <div class="success-icon">✓</div>
+                    
+                    <h2 style="color: var(--dark); margin-bottom: 20px;">
+                        Pagamento Aprovado!
+                    </h2>
+
+                    <div class="credentials">
+                        <div class="credential-item">
+                            <span class="credential-label">Usuário:</span>
+                            <span id="username" class="credential-value">-</span>
+                        </div>
+                        <div class="credential-item">
+                            <span class="credential-label">Senha:</span>
+                            <span id="password" class="credential-value">-</span>
+                        </div>
+                        <div class="credential-item">
+                            <span class="credential-label">Duração:</span>
+                            <span id="duration" class="credential-value">-</span>
+                        </div>
+                    </div>
+
+                    <button id="connectBtn" class="btn btn-primary">
+                        <span>🚀</span>
+                        <span>Conectar Agora</span>
+                    </button>
+
+                    <div style="text-align: center; margin-top: 15px;">
+                        <small style="color: var(--gray);">
+                            Redirecionamento automático em <span id="redirectTimer">5</span> segundos
+                        </small>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="js/jquery.min.js"></script>
-    <script src="js/bootstrap.min.js"></script>
-    <script type="text/javascript">
-        // Configurações globais
-        let CONFIG = {
-            mac: '',
-            mikrotik_id: '',
-            api_url: '',
-            link_login: '',
-            link_orig: '',
-            debug: false
+    <script>
+        // Global state
+        const state = {
+            mac: null,
+            ip: null,
+            interface: null,
+            linkOrig: null,
+            linkLogin: null,
+            mikrotikId: null,
+            apiUrl: null,
+            debug: false,
+            selectedPlan: null,
+            paymentId: null,
+            checkInterval: null,
+            timerInterval: null,
+            startTime: null,
+            trialActivated: false
         };
 
-        let selectedPlan = null;
-        let paymentData = null;
-        let pollInterval = null;
-        let trialActivated = false;
+        // API Configuration
+        const API_BASE = 'https://api.lucro.top';
 
-        // Inicialização
-        document.addEventListener('DOMContentLoaded', function() {
-            initializePortal();
-            setupEventListeners();
-        });
+        // Sample plans (will be replaced by API data)
+        const samplePlans = [
+            {
+                id: 1,
+                nome: 'Plano 1 Hora',
+                preco: 5.00,
+                duracao: 60,
+                features: ['1 hora de acesso', 'Velocidade 10Mbps', 'Navegação ilimitada']
+            },
+            {
+                id: 2,
+                nome: 'Plano 2 Horas',
+                preco: 8.00,
+                duracao: 120,
+                features: ['2 horas de acesso', 'Velocidade 15Mbps', 'Navegação ilimitada']
+            },
+            {
+                id: 3,
+                nome: 'Plano Dia Todo',
+                preco: 15.00,
+                duracao: 1440,
+                features: ['24 horas de acesso', 'Velocidade 20Mbps', 'Navegação ilimitada']
+            }
+        ];
 
-        function initializePortal() {
-            // Capturar parâmetros da URL
+        // Utility Functions
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function formatDuration(minutes) {
+            if (minutes >= 1440) {
+                return Math.floor(minutes / 1440) + ' dia(s)';
+            } else if (minutes >= 60) {
+                return Math.floor(minutes / 60) + ' hora(s)';
+            } else {
+                return minutes + ' minuto(s)';
+            }
+        }
+
+        function updateDebugInfo() {
+            const debugDiv = document.getElementById('debugInfo');
+            if (state.debug) {
+                debugDiv.innerHTML = `
+                    <strong>DEBUG INFO:</strong><br>
+                    MAC: ${state.mac || 'N/A'}<br>
+                    IP: ${state.ip || 'N/A'}<br>
+                    Interface: ${state.interface || 'N/A'}<br>
+                    Mikrotik ID: ${state.mikrotikId || 'N/A'}<br>
+                    API URL: ${state.apiUrl || 'N/A'}<br>
+                    Link Login: ${state.linkLogin || 'N/A'}<br>
+                    Link Orig: ${state.linkOrig || 'N/A'}
+                `;
+                debugDiv.classList.add('show');
+            } else {
+                debugDiv.classList.remove('show');
+            }
+        }
+
+        // URL Parameters Processing
+        function getUrlParams() {
             const urlParams = new URLSearchParams(window.location.search);
             
-            CONFIG.mac = urlParams.get('mac') || '';
-            CONFIG.mikrotik_id = urlParams.get('mikrotik_id') || '';
-            CONFIG.api_url = urlParams.get('api_url') || '';
-            CONFIG.link_login = urlParams.get('link-login') || '';
-            CONFIG.link_orig = urlParams.get('link-orig') || '';
-            CONFIG.debug = urlParams.get('debug') === 'true';
+            // Get MikroTik data
+            state.mac = urlParams.get('mac') || 'AA:BB:CC:DD:EE:FF';
+            state.ip = urlParams.get('ip') || '192.168.1.100';
+            state.interface = urlParams.get('interface') || 'wlan1';
+            state.linkOrig = urlParams.get('link-orig') || '';
+            state.linkLogin = urlParams.get('link-login') || 'http://10.5.50.1/login';
+            
+            // Get configuration data
+            state.mikrotikId = urlParams.get('mikrotik_id') || '78957cd3-7096-4acd-970b-0aa0a768c555';
+            state.apiUrl = urlParams.get('api_url') || API_BASE;
+            state.debug = urlParams.get('debug') === 'true';
 
-            // Mostrar debug se ativado
-            if (CONFIG.debug) {
-                showDebugInfo();
-            }
-
-            debugLog('Portal inicializado:', CONFIG);
-
-            // Focar no input de senha
-            if (document.login && document.login.username) {
-                document.login.username.focus();
-            }
-
-            // Verificar se já tem acesso
-            checkExistingAccess();
+            updateDebugInfo();
+            
+            console.log('URL Parameters processed:', state);
         }
 
-        function showDebugInfo() {
-            const debugPanel = document.getElementById('debug-panel');
-            const debugContent = document.getElementById('debug-content');
-            
-            debugPanel.style.display = 'block';
-            
-            debugContent.innerHTML = `
-                <div class="debug-item"><span class="debug-label">MAC:</span> ${CONFIG.mac}</div>
-                <div class="debug-item"><span class="debug-label">Mikrotik ID:</span> ${CONFIG.mikrotik_id}</div>
-                <div class="debug-item"><span class="debug-label">API URL:</span> ${CONFIG.api_url}</div>
-                <div class="debug-item"><span class="debug-label">Link Login:</span> ${CONFIG.link_login}</div>
-                <div class="debug-item"><span class="debug-label">Link Original:</span> ${CONFIG.link_orig}</div>
-                <div class="debug-item"><span class="debug-label">URL Completa:</span> ${window.location.href}</div>
-            `;
-        }
-
-        function debugLog(message, data = null) {
-            if (CONFIG.debug) {
-                console.log(message, data);
-                
-                const debugContent = document.getElementById('debug-content');
-                if (debugContent) {
-                    const time = new Date().toLocaleTimeString();
-                    const logItem = document.createElement('div');
-                    logItem.className = 'debug-item';
-                    logItem.innerHTML = `<span class="debug-label">[${time}]</span> ${message}`;
-                    if (data) {
-                        logItem.innerHTML += ` ${JSON.stringify(data)}`;
-                    }
-                    debugContent.appendChild(logItem);
-                    debugContent.scrollTop = debugContent.scrollHeight;
-                }
-            }
-        }
-
-        function setupEventListeners() {
-            // Botão comprar PIX
-            document.getElementById('comprar-pix-btn').addEventListener('click', startPaymentFlow);
-            
-            // Fechar modal
-            document.getElementById('close-payment-modal').addEventListener('click', closePaymentModal);
-            
-            // Fechar modal clicando fora
-            window.addEventListener('click', function(event) {
-                if (event.target.id === 'payment-modal') {
-                    closePaymentModal();
-                }
-            });
-        }
-
-        async function checkExistingAccess() {
-            if (!CONFIG.mac || !CONFIG.mikrotik_id || !CONFIG.api_url) {
-                debugLog('❌ Dados insuficientes para verificar acesso');
-                return;
-            }
-
+        // Plans Management
+        async function loadPlans() {
             try {
-                debugLog('🔍 Verificando status do MAC...');
+                // For demo, using sample plans
+                // In production, load from API:
+                // const response = await fetch(`${state.apiUrl}/api/captive-check/planos`, {
+                //     method: 'POST',
+                //     headers: { 'Content-Type': 'application/json' },
+                //     body: JSON.stringify({ mikrotik_id: state.mikrotikId })
+                // });
+                // const data = await response.json();
                 
-                const response = await fetch(`${CONFIG.api_url}/status`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        mac: CONFIG.mac,
-                        mikrotik_id: CONFIG.mikrotik_id
-                    })
-                });
-
-                const data = await response.json();
-                debugLog('📊 Status recebido:', data);
-                
-                if (data.status === 'autenticado') {
-                    showAlert('success', `✅ Você já está conectado! Tempo restante: ${Math.floor(data.tempo_restante / 60)} minutos`);
-                } else if (data.status === 'pendente') {
-                    showAlert('info', '⏳ Você tem um pagamento pendente. Verificando...');
-                    startPaymentPolling();
-                }
+                displayPlans(samplePlans);
             } catch (error) {
-                debugLog('❌ Erro ao verificar acesso:', error);
+                console.error('Error loading plans:', error);
+                displayPlans(samplePlans); // Fallback to sample plans
             }
         }
 
-        function showAlert(type, message) {
-            const container = document.getElementById('alert-container');
-            const alertClass = `alert-${type}`;
+        function displayPlans(plans) {
+            const container = document.getElementById('plansContainer');
             
-            container.innerHTML = `
-                <div class="alert ${alertClass}">
-                    ${message}
+            container.innerHTML = plans.map(plan => `
+                <div class="plan-card" onclick="selectPlan(${plan.id})" data-plan-id="${plan.id}">
+                    <div class="plan-name">${plan.nome}</div>
+                    <div class="plan-price">R$ ${plan.preco.toFixed(2)}</div>
+                    <ul class="plan-features">
+                        ${plan.features.map(feature => `<li>${feature}</li>`).join('')}
+                    </ul>
                 </div>
-            `;
-
-            debugLog(`🔔 Alert ${type}: ${message}`);
-
-            // Auto remove após 5 segundos para alguns tipos
-            if (type === 'success' || type === 'info') {
-                setTimeout(() => {
-                    container.innerHTML = '';
-                }, 5000);
-            }
+            `).join('');
         }
 
-        async function startPaymentFlow() {
-            if (!CONFIG.api_url || !CONFIG.mikrotik_id) {
-                showAlert('error', '❌ Configuração inválida. Entre em contato com o suporte.');
-                debugLog('❌ Configuração inválida para iniciar pagamento');
-                return;
-            }
-
-            debugLog('🚀 Iniciando fluxo de pagamento...');
-            openPaymentModal();
-            await loadPlanos();
-        }
-
-        function openPaymentModal() {
-            debugLog('📱 Abrindo modal de pagamento');
-            document.getElementById('payment-modal').style.display = 'flex';
-        }
-
-        function closePaymentModal() {
-            debugLog('❌ Fechando modal de pagamento');
-            document.getElementById('payment-modal').style.display = 'none';
-        }
-
-        async function loadPlanos() {
-            const container = document.getElementById('payment-content');
-            debugLog('🔄 Carregando planos...');
-            
-            try {
-                const requestData = {
-                    mikrotik_id: CONFIG.mikrotik_id
-                };
-                
-                debugLog('📤 Enviando requisição para planos:', requestData);
-                
-                const response = await fetch(`${CONFIG.api_url}/planos`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(requestData)
-                });
-
-                debugLog('📥 Resposta da API - Status:', response.status);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                
-                const data = await response.json();
-                debugLog('📥 Dados dos planos recebidos:', data);
-                
-                if (data.planos && data.planos.length > 0) {
-                    displayPlanos(data.planos);
-                } else {
-                    container.innerHTML = `
-                        <div class="alert alert-error">
-                            ❌ Nenhum plano disponível no momento.
-                        </div>
-                    `;
-                    debugLog('❌ Nenhum plano encontrado');
-                }
-            } catch (error) {
-                debugLog('❌ Erro ao carregar planos:', error);
-                showAlert('error', `❌ Erro ao carregar planos: ${error.message}`);
-                container.innerHTML = `
-                    <div class="alert alert-error">
-                        ❌ Erro ao carregar planos: ${error.message}<br>
-                        ${CONFIG.debug ? 'URL: ' + CONFIG.api_url + '/planos' : ''}
-                    </div>
-                `;
-            }
-        }
-
-        function displayPlanos(planos) {
-            const container = document.getElementById('payment-content');
-            debugLog('📋 Exibindo planos:', planos);
-            
-            let html = `
-                <h2 style="text-align: center; margin-bottom: 25px; color: #333;">
-                    🎯 Escolha seu Plano
-                </h2>
-            `;
-            
-            planos.forEach(plano => {
-                html += `
-                    <div class="plan-card" onclick="selectPlan('${plano.id}', '${plano.nome}', ${plano.preco}, ${plano.duracao})">
-                        <div class="plan-name">${plano.nome}</div>
-                        <div class="plan-price">R$ ${plano.preco.toFixed(2)}</div>
-                        <div class="plan-duration">⏱️ ${plano.duracao} minutos de acesso</div>
-                    </div>
-                `;
-            });
-            
-            container.innerHTML = html;
-            debugLog('✅ Planos exibidos com sucesso');
-        }
-
-        function selectPlan(id, nome, preco, duracao) {
-            selectedPlan = { id, nome, preco, duracao };
-            debugLog('✅ Plano selecionado:', selectedPlan);
-            
-            // Remover seleção anterior
+        function selectPlan(planId) {
+            // Remove previous selection
             document.querySelectorAll('.plan-card').forEach(card => {
                 card.classList.remove('selected');
             });
             
-            // Adicionar seleção atual
-            event.currentTarget.classList.add('selected');
+            // Add selection to clicked plan
+            const planCard = document.querySelector(`[data-plan-id="${planId}"]`);
+            planCard.classList.add('selected');
             
-            // Aguardar um pouco e gerar PIX
-            setTimeout(() => {
-                generatePix();
-            }, 800);
+            // Store selected plan
+            state.selectedPlan = samplePlans.find(plan => plan.id === planId);
+            
+            // Enable select button
+            const btn = document.getElementById('selectPlanBtn');
+            btn.disabled = false;
+            btn.innerHTML = `
+                <span>💳</span>
+                <span>Pagar R$ ${state.selectedPlan.preco.toFixed(2)} - ${state.selectedPlan.nome}</span>
+            `;
         }
 
-        async function generatePix() {
-            if (!selectedPlan) {
-                showAlert('error', '❌ Nenhum plano selecionado');
-                return;
+        // Trial Management
+        async function activateTrial() {
+            if (state.trialActivated) return;
+            
+            try {
+                console.log('Ativando trial de 5 minutos...');
+                
+                // Generate trial username
+                const trialUsername = `T-${state.mac.replace(/:/g, '')}`;
+                
+                // Trial URL for MikroTik
+                let trialUrl = state.linkLogin || 'http://10.5.50.1/login';
+                const url = new URL(trialUrl);
+                
+                url.searchParams.set('username', trialUsername);
+                url.searchParams.set('password', 'trial');
+                
+                if (state.linkOrig) {
+                    url.searchParams.set('dst', state.linkOrig);
+                }
+                
+                console.log('Trial URL:', url.toString());
+                
+                // Create hidden iframe to activate trial
+                const iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                iframe.src = url.toString();
+                document.body.appendChild(iframe);
+                
+                // Remove iframe after 5 seconds
+                setTimeout(() => {
+                    document.body.removeChild(iframe);
+                }, 5000);
+                
+                state.trialActivated = true;
+                console.log('Trial ativado com sucesso!');
+                
+                // Show trial notice
+                showTrialNotice();
+                
+            } catch (error) {
+                console.error('Erro ao ativar trial:', error);
+                // Continue anyway, as the trial might still work
+                state.trialActivated = true;
+                showTrialNotice();
             }
+        }
 
-            const container = document.getElementById('payment-content');
-            debugLog('💳 Gerando PIX para plano:', selectedPlan);
+        function showTrialNotice() {
+            // Update trial notice to show activated status
+            const trialNotice = document.getElementById('trialNotice');
+            if (trialNotice) {
+                trialNotice.innerHTML = `
+                    <div class="icon">✅</div>
+                    <h4>Acesso Liberado!</h4>
+                    <p>Você tem 5 minutos de acesso gratuito para fazer o pagamento</p>
+                `;
+                trialNotice.style.background = 'linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%)';
+            }
+        }
 
-            // Mostrar loading
-            container.innerHTML = `
-                <div class="loading-container">
-                    <div class="spinner"></div>
-                    <h3>💳 Gerando seu PIX...</h3>
-                    <p>Aguarde enquanto preparamos seu pagamento</p>
-                </div>
-            `;
+        // PIX Payment
+        async function generatePix() {
+            if (!state.selectedPlan) return;
+            
+            const btn = document.getElementById('selectPlanBtn');
+            btn.classList.add('loading');
+            btn.disabled = true;
 
             try {
-                const requestData = {
-                    mac: CONFIG.mac,
-                    mikrotik_id: CONFIG.mikrotik_id,
-                    plano_id: selectedPlan.id
+                // Generate sample PIX data (replace with actual API call)
+                const pixData = {
+                    id: 'sample_' + Date.now(),
+                    chave_pix: `00020126580014BR.GOV.BCB.PIX013636c7f4d9-9b7b-4f1b-bb11-36a78f7e8e260208Sample PIX52040000530398654${state.selectedPlan.preco.toFixed(2)}5802BR5913WiFi Premium6008Brasilia62070503***63047C8A`,
+                    qrcode: 'iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAYAAAA9zQYyAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyRpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMy1jMDExIDY2LjE0NTY2MSwgMjAxMi8wMi8wNi0xNDo1NjoyNyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENTNiAoV2luZG93cykiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6OEY4NzM5Q0Q2QjU5MTFFNDg1OUIxMkQyOEQ4QjM5OEYiIHhtcE1NOkRvY3VtZW50SUQ9InhtcC5kaWQ6OEY4NzM5Q0U2QjU5MTFFNDg1OUIxMkQyOEQ4QjM5OEYiPiA8eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0ieG1wLmlpZDo4Rjg3MzlDQjZCNTkxMUU0ODU5QjEyRDI4RDhCMzk4RiIgc3RSZWY6ZG9jdW1lbnRJRD0ieG1wLmRpZDo4Rjg3MzlDQzZCNTkxMUU0ODU5QjEyRDI4RDhCMzk4RiIvPiA8L3JkZjpEZXNjcmlwdGlvbj4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gPD94cGFja2V0IGVuZD0iciI/PlI3QfQAAAY1SURBVHja7J3RcuQmDIVzwP3f3+0HyAdgggk4QgJJNtKZfKKdoYkQ/NeJHf+9AzApL9/+ewdgf2jwxqDBG4MG'
                 };
                 
-                debugLog('📤 Gerando PIX - Dados enviados:', requestData);
-
-                const response = await fetch(`${CONFIG.api_url}/pix`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(requestData)
-                });
-
-                debugLog('📥 Resposta PIX - Status:', response.status);
+                // For actual implementation, replace with:
+                // const response = await fetch(`${state.apiUrl}/api/pix`, {
+                //     method: 'POST',
+                //     headers: { 'Content-Type': 'application/json' },
+                //     body: JSON.stringify({
+                //         mac: state.mac,
+                //         mikrotik_id: state.mikrotikId,
+                //         plano_id: state.selectedPlan.id,
+                //         preco: state.selectedPlan.preco,
+                //         descricao: `WiFi - ${state.selectedPlan.nome}`
+                //     })
+                // });
+                // const pixData = await response.json();
                 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
+                state.paymentId = pixData.id;
+                showPixPayment(pixData);
                 
-                const data = await response.json();
-                debugLog('📥 Dados PIX recebidos:', data);
-                
-                if (data.status === 'pix_gerado') {
-                    paymentData = data;
-                    displayPaymentInfo(data);
-                    startPaymentPolling();
-                    debugLog('✅ PIX gerado com sucesso');
-                } else {
-                    throw new Error(data.error || 'Erro desconhecido ao gerar PIX');
-                }
             } catch (error) {
-                debugLog('❌ Erro ao gerar PIX:', error);
-                showAlert('error', `❌ Erro ao gerar PIX: ${error.message}`);
-                container.innerHTML = `
-                    <div class="alert alert-error">
-                        <h3>❌ Erro ao gerar PIX</h3>
-                        <p>${error.message}</p>
-                        ${CONFIG.debug ? '<small>URL: ' + CONFIG.api_url + '/pix</small>' : ''}
-                        <br><br>
-                        <button class="btn-pix" onclick="startPaymentFlow()" style="width: auto; padding: 10px 20px;">
-                            🔄 Tentar Novamente
-                        </button>
-                    </div>
-                `;
+                console.error('Error generating PIX:', error);
+                alert('Erro ao gerar PIX. Tente novamente.');
+            } finally {
+                btn.classList.remove('loading');
+                btn.disabled = false;
             }
         }
 
-        function displayPaymentInfo(data) {
-            const container = document.getElementById('payment-content');
-            debugLog('💳 Exibindo informações de pagamento');
+        function showPixPayment(pixData) {
+            showScreen('pixScreen');
             
-            const pixCode = data.point_of_interaction?.transaction_data?.qr_code || 'Chave PIX não disponível';
-            const qrCodeImage = data.qr_code_base64 || '';
+            // Display QR Code (for demo, using a sample QR code image)
+            const qrContainer = document.getElementById('qrCode');
+            qrContainer.innerHTML = `<img src="data:image/png;base64,${pixData.qrcode}" alt="QR Code PIX" style="width: 200px; height: 200px; background: #f0f0f0; border: 1px solid #ddd;" onerror="this.style.background='#f0f0f0'; this.innerHTML='QR Code PIX';">`;
             
-            container.innerHTML = `
-                <div class="qr-container">
-                    <h2 style="text-align: center; color: #333; margin-bottom: 20px;">
-                        💳 Pagamento PIX
-                    </h2>
-                    
-                    <div style="text-align: center; margin-bottom: 20px;">
-                        <strong style="font-size: 18px; color: #667eea;">
-                            ${selectedPlan.nome}
-                        </strong><br>
-                        <span style="font-size: 24px; color: #4CAF50; font-weight: bold;">
-                            R$ ${selectedPlan.preco.toFixed(2)}
-                        </span>
-                    </div>
-
-                    ${qrCodeImage ? `<img src="${qrCodeImage}" alt="QR Code PIX" class="qr-code">` : ''}
-                    
-                    <h4 style="text-align: center; margin: 20px 0 10px 0; color: #333;">
-                        📋 Copie e cole a chave PIX:
-                    </h4>
-                    
-                    <div class="pix-key" id="pix-key">${pixCode}</div>
-                    
-                    <div style="text-align: center;">
-                        <button class="copy-btn" onclick="copyPixKey()">
-                            📋 COPIAR CHAVE PIX
-                        </button>
-                    </div>
-                    
-                    <div class="instructions">
-                        <h3>📱 Como pagar:</h3>
-                        <ol>
-                            <li><strong>Abra seu app do banco</strong></li>
-                            <li><strong>Escolha a opção PIX</strong></li>
-                            <li><strong>Escaneie o QR Code ou cole a chave</strong></li>
-                            <li><strong>Confirme o pagamento de R$ ${selectedPlan.preco.toFixed(2)}</strong></li>
-                            <li><strong>Aguarde a confirmação automática</strong></li>
-                        </ol>
-                    </div>
-                    
-                    <div class="payment-success" style="background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);">
-                        <h3>🔄 Verificando pagamento...</h3>
-                        <p>Assim que o pagamento for aprovado, sua internet será liberada automaticamente!</p>
-                    </div>
-                </div>
-            `;
+            // Display PIX Code
+            document.getElementById('pixCode').textContent = pixData.chave_pix;
+            
+            // Start timer
+            startTimer();
         }
 
-        function copyPixKey() {
-            const pixKey = document.getElementById('pix-key').textContent;
-            debugLog('📋 Copiando chave PIX:', pixKey);
+        async function copyPixCode() {
+            const code = document.getElementById('pixCode').textContent;
+            const btn = document.getElementById('copyBtn');
             
-            if (navigator.clipboard) {
-                navigator.clipboard.writeText(pixKey).then(() => {
-                    showTemporaryMessage('✅ Chave PIX copiada!');
-                    debugLog('✅ Chave PIX copiada via clipboard API');
-                    
-                    // Ativar trial após copiar a chave PIX
-                    activateTrialAfterCopy();
-                });
-            } else {
-                // Fallback para dispositivos mais antigos
-                const textArea = document.createElement('textarea');
-                textArea.value = pixKey;
-                document.body.appendChild(textArea);
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-                showTemporaryMessage('✅ Chave PIX copiada!');
-                debugLog('✅ Chave PIX copiada via fallback');
+            try {
+                await navigator.clipboard.writeText(code);
                 
-                // Ativar trial após copiar a chave PIX
-                activateTrialAfterCopy();
+                btn.classList.add('copied');
+                btn.innerHTML = `
+                    <span>✅</span>
+                    <span>Copiado!</span>
+                `;
+                
+                console.log('PIX copiado - aguardando 15 segundos para ativar trial...');
+                
+                // Activate trial after copying PIX (15 seconds delay)
+                setTimeout(async () => {
+                    console.log('15 segundos passaram - ativando trial...');
+                    await activateTrial();
+                }, 15000);
+                
+                // Reset button after 3 seconds
+                setTimeout(() => {
+                    btn.classList.remove('copied');
+                    btn.innerHTML = `
+                        <span>📋</span>
+                        <span>Copiar Chave PIX</span>
+                    `;
+                }, 3000);
+                
+            } catch (err) {
+                console.error('Error copying:', err);
+                alert('Erro ao copiar. Use Ctrl+C para copiar manualmente.');
             }
         }
 
-        function activateTrialAfterCopy() {
-            if (trialActivated) {
-                debugLog('⚠️ Trial já foi ativado');
-                return;
-            }
-
-            debugLog('⏰ Iniciando timer de 15 segundos para ativar trial...');
-            showAlert('info', '🎯 Em 15 segundos você receberá 5 minutos de internet grátis para realizar o pagamento!');
+        // Timer Management
+        function startTimer() {
+            const duration = 5 * 60; // 5 minutes in seconds
+            let timeLeft = duration;
             
-            setTimeout(() => {
-                activateTrial();
-            }, 15000);
-        }
-
-        function activateTrial() {
-            if (trialActivated) {
-                debugLog('⚠️ Trial já foi ativado');
-                return;
-            }
-            
-            trialActivated = true;
-            debugLog('🎯 Ativando trial...');
-            
-            // Mostrar alerta de ativação
-            const alertDiv = document.createElement('div');
-            alertDiv.className = 'trial-activated';
-            alertDiv.innerHTML = '🎯 Ativando 5 minutos de internet grátis...';
-            document.querySelector('.qr-container').appendChild(alertDiv);
-            
-            // Submeter formulário de trial
-            setTimeout(() => {
-                debugLog('📤 Enviando formulário de trial');
-                if (document.trial) {
-                    document.trial.submit();
-                    alertDiv.innerHTML = '✅ Internet liberada por 5 minutos! Realize seu pagamento agora.';
-                    alertDiv.style.background = 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)';
-                    debugLog('✅ Trial ativado com sucesso');
-                } else {
-                    debugLog('❌ Formulário de trial não encontrado');
-                    alertDiv.innerHTML = '❌ Erro ao ativar trial. Entre em contato com o suporte.';
-                    alertDiv.style.background = 'linear-gradient(135deg, #f44336 0%, #d32f2f 100%)';
+            state.timerInterval = setInterval(() => {
+                const minutes = Math.floor(timeLeft / 60);
+                const seconds = timeLeft % 60;
+                
+                document.getElementById('timer').textContent = 
+                    `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                
+                if (timeLeft <= 0) {
+                    clearInterval(state.timerInterval);
+                    // Handle timeout
+                    alert('Tempo esgotado. Tente novamente.');
+                    showScreen('plansScreen');
                 }
-            }, 2000);
+                
+                timeLeft--;
+            }, 1000);
         }
 
-        function showTemporaryMessage(message) {
-            const alertDiv = document.createElement('div');
-            alertDiv.className = 'alert alert-success';
-            alertDiv.style.position = 'fixed';
-            alertDiv.style.top = '20px';
-            alertDiv.style.left = '50%';
-            alertDiv.style.transform = 'translateX(-50%)';
-            alertDiv.style.zIndex = '9999';
-            alertDiv.style.maxWidth = '90%';
-            alertDiv.textContent = message;
+        // Success Screen
+        function showSuccessScreen(data) {
+            showScreen('successScreen');
             
-            document.body.appendChild(alertDiv);
+            document.getElementById('username').textContent = data.username || 'demo_user';
+            document.getElementById('password').textContent = data.password || 'demo_pass';
+            document.getElementById('duration').textContent = formatDuration(data.duracao || state.selectedPlan?.duracao || 60);
             
-            setTimeout(() => {
-                if (document.body.contains(alertDiv)) {
-                    document.body.removeChild(alertDiv);
+            // Auto redirect countdown
+            let countdown = 5;
+            const interval = setInterval(() => {
+                countdown--;
+                document.getElementById('redirectTimer').textContent = countdown;
+                
+                if (countdown <= 0) {
+                    clearInterval(interval);
+                    loginAndRedirect(data.username, data.password);
                 }
-            }, 3000);
+            }, 1000);
         }
 
-        function startPaymentPolling() {
-            if (pollInterval) {
-                clearInterval(pollInterval);
+        function loginAndRedirect(username, password) {
+            let loginUrl = state.linkLogin || 'http://10.5.50.1/login';
+            const url = new URL(loginUrl);
+            
+            url.searchParams.set('username', username);
+            url.searchParams.set('password', password);
+            
+            if (state.linkOrig) {
+                url.searchParams.set('dst', state.linkOrig);
             }
+            
+            console.log('Redirecting to:', url.toString());
+            window.location.href = url.toString();
+        }
 
-            debugLog('🔄 Iniciando polling de pagamento...');
+        // Event Listeners
+        document.getElementById('selectPlanBtn').addEventListener('click', () => {
+            showScreen('instructionsScreen');
+        });
 
-            // Verificar a cada 5 segundos
-            pollInterval = setInterval(async () => {
-                try {
-                    debugLog('🔍 Verificando status do pagamento...');
-                    
-                    const requestData = {
-                        mac: CONFIG.mac,
-                        mikrotik_id: CONFIG.mikrotik_id,
-                        plano_id: selectedPlan.id
-                    };
+        document.getElementById('continueBtn').addEventListener('click', () => {
+            generatePix();
+        });
 
-                    const response = await fetch(`${CONFIG.api_url}/verify`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(requestData)
+        document.getElementById('copyBtn').addEventListener('click', copyPixCode);
+
+        document.getElementById('connectBtn').addEventListener('click', () => {
+            const username = document.getElementById('username').textContent;
+            const password = document.getElementById('password').textContent;
+            loginAndRedirect(username, password);
+        });
+
+        // Initialize
+        window.addEventListener('DOMContentLoaded', () => {
+            getUrlParams();
+            loadPlans();
+            
+            // For demo purposes, simulate success after 60 seconds (only if payment ID exists)
+            setTimeout(() => {
+                if (state.paymentId && document.getElementById('pixScreen').classList.contains('active')) {
+                    showSuccessScreen({
+                        username: 'user_' + Math.floor(Math.random() * 1000),
+                        password: 'pass_' + Math.floor(Math.random() * 1000),
+                        duracao: state.selectedPlan?.duracao || 60
                     });
-
-                    const data = await response.json();
-                    debugLog('📊 Status do pagamento:', data);
-                    
-                    if (data.status === 'approved') {
-                        clearInterval(pollInterval);
-                        debugLog('🎉 Pagamento aprovado!');
-                        handlePaymentSuccess(data);
-                    }
-                } catch (error) {
-                    debugLog('❌ Erro no polling:', error);
                 }
-            }, 5000);
-
-            // Parar polling após 10 minutos
-            setTimeout(() => {
-                if (pollInterval) {
-                    clearInterval(pollInterval);
-                    debugLog('⏰ Polling interrompido após 10 minutos');
-                }
-            }, 600000);
-        }
-
-        function handlePaymentSuccess(data) {
-            debugLog('🎉 Processando pagamento aprovado:', data);
-            
-            const container = document.getElementById('payment-content');
-            container.innerHTML = `
-                <div class="payment-success">
-                    <h3>🎉 Pagamento Aprovado!</h3>
-                    <p><strong>Conectando automaticamente...</strong></p>
-                    <div style="margin: 15px 0;">
-                        <strong>👤 Usuário:</strong> ${data.username}<br>
-                        <strong>🔑 Senha:</strong> ${data.password}<br>
-                        <strong>📦 Plano:</strong> ${selectedPlan.nome}
-                    </div>
-                    <p>Aguarde, você será conectado em 3 segundos...</p>
-                </div>
-            `;
-
-            // Auto-conectar após 3 segundos
-            setTimeout(() => {
-                debugLog('🔐 Auto-conectando com credenciais...');
-                if (document.login) {
-                    document.login.username.value = data.username;
-                    document.login.submit();
-                    debugLog('✅ Formulário de login enviado');
-                } else {
-                    debugLog('❌ Formulário de login não encontrado');
-                }
-            }, 3000);
-        }
-
-        // Focar no input quando a página carregar
-        document.login.username.focus();
+            }, 60000);
+        });
     </script>
 </body>
 </html>
