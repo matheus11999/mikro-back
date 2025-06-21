@@ -5,25 +5,20 @@
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     <meta http-equiv="pragma" content="no-cache" />
     <meta http-equiv="expires" content="-1" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-    <title>Avistão WIFI - Portal de Acesso</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0; maximum-scale=1.0;"/>
+    <title>Avistão WIFI</title>
     <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/style.css" rel="stylesheet">
     
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-    </script>
-</body>
-</html>
-        
+        /* Estilos adicionais para melhorar UX mobile */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            color: #333;
-            overflow-x: hidden;
+            margin: 0;
+            padding: 0;
         }
         
         .container {
@@ -36,14 +31,8 @@
             justify-content: center;
         }
         
-        .logo {
-            text-align: center;
-            margin-bottom: 30px;
-            animation: fadeInDown 0.8s ease-out;
-        }
-        
         .logo img {
-            max-width: 200px;
+            max-width: 100%;
             height: auto;
             filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
         }
@@ -54,40 +43,10 @@
             padding: 30px;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
             backdrop-filter: blur(10px);
-            animation: fadeInUp 0.8s ease-out 0.2s both;
+            animation: fadeInUp 0.8s ease-out;
         }
         
-        .panel h2 {
-            text-align: center;
-            margin-bottom: 25px;
-            color: #333;
-            font-weight: 600;
-            font-size: 24px;
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
-        .form-input {
-            width: 100%;
-            padding: 15px;
-            border: 2px solid #e1e5e9;
-            border-radius: 12px;
-            font-size: 16px;
-            transition: all 0.3s ease;
-            background: #f8f9fa;
-        }
-        
-        .form-input:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-            background: white;
-            transform: translateY(-2px);
-        }
-        
-        .btn {
+        .btn-login {
             width: 100%;
             padding: 15px;
             border: none;
@@ -98,57 +57,54 @@
             transition: all 0.3s ease;
             text-transform: uppercase;
             letter-spacing: 1px;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .btn:before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            transition: left 0.5s;
-        }
-        
-        .btn:hover:before {
-            left: 100%;
-        }
-        
-        .btn-primary {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             margin-bottom: 15px;
         }
         
-        .btn-primary:hover {
+        .btn-login:hover {
             transform: translateY(-3px);
             box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
         }
         
-        .btn-success {
+        .btn-pix {
             background: linear-gradient(135deg, #56ab2f 0%, #a8e6cf 100%);
             color: white;
             font-size: 18px;
             padding: 18px;
             animation: pulse 2s infinite;
+            border: none;
+            border-radius: 12px;
+            width: 100%;
+            cursor: pointer;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
         }
         
-        .btn-success:hover {
+        .btn-pix:hover {
             transform: translateY(-3px);
             box-shadow: 0 10px 25px rgba(86, 171, 47, 0.4);
         }
         
-        .btn-warning {
-            background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
-            color: white;
+        .username {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+            box-sizing: border-box;
         }
         
-        .btn-warning:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 25px rgba(255, 152, 0, 0.4);
+        .username:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            background: white;
+            transform: translateY(-2px);
         }
         
         .divider {
@@ -182,8 +138,8 @@
             animation: slideInLeft 0.5s ease-out;
         }
         
-        .alert-error {
-            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+        .alert-info {
+            background: linear-gradient(135deg, #74c0fc 0%, #339af0 100%);
             color: white;
         }
         
@@ -192,14 +148,47 @@
             color: white;
         }
         
-        .alert-info {
-            background: linear-gradient(135deg, #74c0fc 0%, #339af0 100%);
+        .alert-error {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
             color: white;
         }
         
         .alert-warning {
             background: linear-gradient(135deg, #ffa726 0%, #fb8c00 100%);
             color: white;
+        }
+        
+        /* Debug Panel */
+        .debug-panel {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.9);
+            color: #00ff00;
+            padding: 10px;
+            border-radius: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            z-index: 9999;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .debug-panel h4 {
+            color: #ffff00;
+            margin: 0 0 10px 0;
+            font-size: 14px;
+        }
+        
+        .debug-panel .debug-item {
+            margin: 5px 0;
+            word-break: break-all;
+        }
+        
+        .debug-panel .debug-label {
+            color: #ff9800;
+            font-weight: bold;
         }
         
         /* Modal Styles */
@@ -382,14 +371,6 @@
             color: white;
         }
         
-        .countdown {
-            font-size: 20px;
-            font-weight: bold;
-            color: #ff5722;
-            text-align: center;
-            margin: 15px 0;
-        }
-        
         .trial-info {
             background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
             padding: 20px;
@@ -411,17 +392,6 @@
         @keyframes fadeIn {
             from { opacity: 0; }
             to { opacity: 1; }
-        }
-        
-        @keyframes fadeInDown {
-            from {
-                opacity: 0;
-                transform: translateY(-30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
         }
         
         @keyframes fadeInUp {
@@ -463,15 +433,9 @@
         }
         
         @keyframes pulse {
-            0% {
-                transform: scale(1);
-            }
-            50% {
-                transform: scale(1.05);
-            }
-            100% {
-                transform: scale(1);
-            }
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
         }
         
         /* Responsive */
@@ -488,10 +452,21 @@
                 padding: 20px;
                 margin: 20px;
             }
+            
+            .debug-panel {
+                font-size: 10px;
+                max-height: 150px;
+            }
         }
     </style>
 </head>
 <body>
+    <!-- Debug Panel -->
+    <div id="debug-panel" class="debug-panel hidden">
+        <h4>🐛 DEBUG MODE</h4>
+        <div id="debug-content"></div>
+    </div>
+
     <!-- Formulário oculto para login CHAP -->
     $(if chap-id)
         <form name="sendin" action="$(link-login-only)" method="post" style="display:none">
@@ -500,7 +475,7 @@
             <input type="hidden" name="dst" value="$(link-orig)" />
             <input type="hidden" name="popup" value="true" />
         </form>
-        
+
         <script type="text/javascript">
             function doLogin() {
                 document.sendin.username.value = document.login.username.value;
@@ -520,50 +495,40 @@
     </form>
 
     <div class="container">
-        <!-- Logo -->
-        <div class="logo">
-            <img src="img/logo.png" alt="Avistão WIFI" onerror="this.style.display='none'">
-        </div>
-
-        <!-- Painel Principal -->
-        <div class="panel">
-            <h2>Conectar ao WiFi</h2>
-
-            <!-- Alertas -->
-            <div id="alert-container">
-                $(if error)
-                <div class="alert alert-error">
-                    <strong>Erro!</strong> $(error).
+        <img src="img/logo.png" style="width: 100%;" onerror="this.style.display='none'">
+        <div class="col-md-4">
+            <div class="panel-second"></div>
+            <div class="panel">
+                <!-- Alertas -->
+                <div id="alert-container">
+                    $(if error)
+                    <div class="alert alert-info">
+                        <strong>Erro!</strong> $(error).
+                    </div>
+                    $(endif)
                 </div>
-                $(endif)
-            </div>
 
-            <!-- Formulário de Login -->
-            <form class="login" name="login" action="$(link-login-only)" method="post"
-                $(if chap-id) onSubmit="return doLogin()" $(endif)>
-                <input type="hidden" name="dst" value="$(link-orig)" />
-                <input type="hidden" name="popup" value="true" />
-                
-                <div class="form-group">
-                    <input type="text" name="username" class="form-input" value="$(username)" 
-                           placeholder="Digite sua senha de acesso..." />
-                    <input type="hidden" name="password" value=""/>
+                <form class="login" name="login" action="$(link-login-only)" method="post"
+                    $(if chap-id) onSubmit="return doLogin()" $(endif)>
+                    <input type="hidden" name="dst" value="$(link-orig)" />
+                    <input type="hidden" name="popup" value="true" />
+                    <div class="s-login">
+                        <input type="text" name="username" class="username" value="$(username)" placeholder="Digite a Senha Aqui..." />
+                        <input type="hidden" name="password" value=""/>
+                    </div>
+                    <button type="submit" class="btn-login text-space">CONECTAR</button>
+                </form>
+
+                <!-- Divider -->
+                <div class="divider">
+                    <span>OU</span>
                 </div>
-                
-                <button type="submit" class="btn btn-primary">
-                    CONECTAR AGORA
+
+                <!-- Botão Comprar via PIX -->
+                <button type="button" class="btn-pix" id="comprar-pix-btn">
+                    💳 COMPRAR ACESSO VIA PIX
                 </button>
-            </form>
-
-            <!-- Divider -->
-            <div class="divider">
-                <span>OU</span>
             </div>
-
-            <!-- Botão Comprar via PIX -->
-            <button type="button" class="btn btn-success" id="comprar-pix-btn">
-                💳 COMPRAR ACESSO VIA PIX
-            </button>
         </div>
     </div>
 
@@ -597,7 +562,7 @@
             <div class="status-message status-trial">
                 🎯 Clique em "CONTINUAR" para gerar sua chave PIX e liberar o acesso temporário!
             </div>
-            <button type="button" class="btn btn-success" id="continuar-btn">
+            <button type="button" class="btn-pix" id="continuar-btn">
                 CONTINUAR COM O PAGAMENTO
             </button>
         </div>
@@ -616,14 +581,17 @@
         </div>
     </div>
 
-    <script>
+    <script src="js/jquery.min.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+    <script type="text/javascript">
         // Configurações globais
         let CONFIG = {
             mac: '',
             mikrotik_id: '',
             api_url: '',
             link_login: '',
-            link_orig: ''
+            link_orig: '',
+            debug: false
         };
 
         let selectedPlan = null;
@@ -646,6 +614,12 @@
             CONFIG.api_url = urlParams.get('api_url') || '';
             CONFIG.link_login = urlParams.get('link-login') || '';
             CONFIG.link_orig = urlParams.get('link-orig') || '';
+            CONFIG.debug = urlParams.get('debug') === 'true';
+
+            // Mostrar debug se ativado
+            if (CONFIG.debug) {
+                showDebugInfo();
+            }
 
             console.log('Portal inicializado com:', CONFIG);
 
@@ -656,6 +630,22 @@
 
             // Verificar se já tem acesso
             checkExistingAccess();
+        }
+
+        function showDebugInfo() {
+            const debugPanel = document.getElementById('debug-panel');
+            const debugContent = document.getElementById('debug-content');
+            
+            debugPanel.classList.remove('hidden');
+            
+            debugContent.innerHTML = `
+                <div class="debug-item"><span class="debug-label">MAC:</span> ${CONFIG.mac}</div>
+                <div class="debug-item"><span class="debug-label">Mikrotik ID:</span> ${CONFIG.mikrotik_id}</div>
+                <div class="debug-item"><span class="debug-label">API URL:</span> ${CONFIG.api_url}</div>
+                <div class="debug-item"><span class="debug-label">Link Login:</span> ${CONFIG.link_login}</div>
+                <div class="debug-item"><span class="debug-label">Link Original:</span> ${CONFIG.link_orig}</div>
+                <div class="debug-item"><span class="debug-label">URL Completa:</span> ${window.location.href}</div>
+            `;
         }
 
         function setupEventListeners() {
@@ -679,10 +669,15 @@
 
         async function checkExistingAccess() {
             if (!CONFIG.mac || !CONFIG.mikrotik_id || !CONFIG.api_url) {
+                if (CONFIG.debug) {
+                    debugLog('❌ Dados insuficientes para verificar acesso');
+                }
                 return;
             }
 
             try {
+                debugLog('🔍 Verificando status do MAC...');
+                
                 const response = await fetch(`${CONFIG.api_url}/status`, {
                     method: 'POST',
                     headers: {
@@ -695,16 +690,37 @@
                 });
 
                 const data = await response.json();
+                debugLog('📊 Status recebido:', data);
                 
                 if (data.status === 'autenticado') {
                     showAlert('success', `✅ Você já está conectado! Tempo restante: ${Math.floor(data.tempo_restante / 60)} minutos`);
                 } else if (data.status === 'pendente') {
-                    showAlert('info', '⏳ Você tem um pagamento pendente. Verifique se foi aprovado.');
+                    showAlert('info', '⏳ Você tem um pagamento pendente. Verificando...');
                     // Continuar polling se há pagamento pendente
                     startPaymentPolling();
                 }
             } catch (error) {
+                debugLog('❌ Erro ao verificar acesso:', error);
                 console.error('Erro ao verificar acesso:', error);
+            }
+        }
+
+        function debugLog(message, data = null) {
+            if (CONFIG.debug) {
+                console.log(message, data);
+                
+                const debugContent = document.getElementById('debug-content');
+                const time = new Date().toLocaleTimeString();
+                const logItem = document.createElement('div');
+                logItem.className = 'debug-item';
+                logItem.innerHTML = `<span class="debug-label">[${time}]</span> ${message}`;
+                if (data) {
+                    logItem.innerHTML += ` ${JSON.stringify(data, null, 2)}`;
+                }
+                debugContent.appendChild(logItem);
+                
+                // Scroll para o final
+                debugContent.scrollTop = debugContent.scrollHeight;
             }
         }
 
@@ -718,6 +734,8 @@
                 </div>
             `;
 
+            debugLog(`🔔 Alert ${type}: ${message}`);
+
             // Auto remove após 5 segundos para alguns tipos
             if (type === 'success' || type === 'info') {
                 setTimeout(() => {
@@ -729,22 +747,27 @@
         async function openPlanosModal() {
             if (!CONFIG.api_url || !CONFIG.mikrotik_id) {
                 showAlert('error', '❌ Configuração inválida. Entre em contato com o suporte.');
+                debugLog('❌ Configuração inválida para abrir planos');
                 return;
             }
 
+            debugLog('📋 Abrindo modal de planos...');
             document.getElementById('planos-modal').style.display = 'flex';
             await loadPlanos();
         }
 
         function closePlanosModal() {
+            debugLog('❌ Fechando modal de planos');
             document.getElementById('planos-modal').style.display = 'none';
         }
 
         function closeTutorialModal() {
+            debugLog('❌ Fechando modal de tutorial');
             document.getElementById('tutorial-modal').style.display = 'none';
         }
 
         function closeAllModals() {
+            debugLog('❌ Fechando todos os modais');
             document.getElementById('planos-modal').style.display = 'none';
             document.getElementById('tutorial-modal').style.display = 'none';
             document.getElementById('pagamento-modal').style.display = 'none';
@@ -752,19 +775,26 @@
 
         async function loadPlanos() {
             const container = document.getElementById('planos-container');
+            debugLog('🔄 Carregando planos...');
             
             try {
+                const requestData = {
+                    mikrotik_id: CONFIG.mikrotik_id
+                };
+                
+                debugLog('📤 Enviando requisição para planos:', requestData);
+                
                 const response = await fetch(`${CONFIG.api_url}/planos`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        mikrotik_id: CONFIG.mikrotik_id
-                    })
+                    body: JSON.stringify(requestData)
                 });
 
+                debugLog('📥 Resposta da API - Status:', response.status);
                 const data = await response.json();
+                debugLog('📥 Dados dos planos recebidos:', data);
                 
                 if (data.planos && data.planos.length > 0) {
                     displayPlanos(data.planos);
@@ -774,12 +804,15 @@
                             ❌ Nenhum plano disponível no momento.
                         </div>
                     `;
+                    debugLog('❌ Nenhum plano encontrado');
                 }
             } catch (error) {
+                debugLog('❌ Erro ao carregar planos:', error);
                 console.error('Erro ao carregar planos:', error);
                 container.innerHTML = `
                     <div class="alert alert-error">
-                        ❌ Erro ao carregar planos. Tente novamente.
+                        ❌ Erro ao carregar planos. Tente novamente.<br>
+                        ${CONFIG.debug ? 'Erro: ' + error.message : ''}
                     </div>
                 `;
             }
@@ -787,6 +820,7 @@
 
         function displayPlanos(planos) {
             const container = document.getElementById('planos-container');
+            debugLog('📋 Exibindo planos:', planos);
             
             let html = '';
             planos.forEach(plano => {
@@ -800,10 +834,12 @@
             });
             
             container.innerHTML = html;
+            debugLog('✅ Planos exibidos com sucesso');
         }
 
         function selectPlan(id, nome, preco, duracao) {
             selectedPlan = { id, nome, preco, duracao };
+            debugLog('✅ Plano selecionado:', selectedPlan);
             
             // Remover seleção anterior
             document.querySelectorAll('.plan-card').forEach(card => {
@@ -816,6 +852,7 @@
             // Aguardar um pouco e mostrar tutorial
             setTimeout(() => {
                 closePlanosModal();
+                debugLog('📖 Mostrando tutorial');
                 document.getElementById('tutorial-modal').style.display = 'flex';
             }, 500);
         }
@@ -823,9 +860,11 @@
         async function handleContinuar() {
             if (!selectedPlan) {
                 showAlert('error', '❌ Nenhum plano selecionado');
+                debugLog('❌ Tentativa de continuar sem plano selecionado');
                 return;
             }
 
+            debugLog('🚀 Iniciando processo de pagamento para plano:', selectedPlan);
             closeTutorialModal();
             
             // Ativar trial imediatamente
@@ -833,55 +872,75 @@
             
             // Gerar PIX após 15 segundos
             setTimeout(async () => {
+                debugLog('⏰ 15 segundos passaram, gerando PIX...');
                 await generatePix();
             }, 15000);
         }
 
         function activateTrial() {
-            if (trialActivated) return;
+            if (trialActivated) {
+                debugLog('⚠️ Trial já foi ativado');
+                return;
+            }
             
             trialActivated = true;
+            debugLog('🎯 Ativando trial...');
             showAlert('warning', '🎯 Ativando acesso temporário de 5 minutos...');
             
             // Simular clique no trial do Mikrotik
             setTimeout(() => {
+                debugLog('📤 Enviando formulário de trial');
                 if (document.trial) {
                     document.trial.submit();
+                    showAlert('success', '✅ Acesso temporário ativado! Você tem 5 minutos para realizar o pagamento.');
+                    debugLog('✅ Trial enviado com sucesso');
+                } else {
+                    debugLog('❌ Formulário de trial não encontrado');
+                    showAlert('error', '❌ Erro ao ativar trial. Entre em contato com o suporte.');
                 }
-                showAlert('success', '✅ Acesso temporário ativado! Você tem 5 minutos para realizar o pagamento.');
             }, 2000);
         }
 
         async function generatePix() {
+            debugLog('💳 Abrindo modal de pagamento');
             document.getElementById('pagamento-modal').style.display = 'flex';
 
             try {
+                const requestData = {
+                    mac: CONFIG.mac,
+                    mikrotik_id: CONFIG.mikrotik_id,
+                    plano_id: selectedPlan.id
+                };
+                
+                debugLog('📤 Gerando PIX - Dados enviados:', requestData);
+
                 const response = await fetch(`${CONFIG.api_url}/pix`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        mac: CONFIG.mac,
-                        mikrotik_id: CONFIG.mikrotik_id,
-                        plano_id: selectedPlan.id
-                    })
+                    body: JSON.stringify(requestData)
                 });
 
+                debugLog('📥 Resposta PIX - Status:', response.status);
                 const data = await response.json();
+                debugLog('📥 Dados PIX recebidos:', data);
                 
                 if (data.status === 'pix_gerado') {
                     paymentData = data;
                     displayPaymentInfo(data);
                     startPaymentPolling();
+                    debugLog('✅ PIX gerado com sucesso');
                 } else {
                     throw new Error(data.error || 'Erro ao gerar PIX');
                 }
             } catch (error) {
+                debugLog('❌ Erro ao gerar PIX:', error);
                 console.error('Erro ao gerar PIX:', error);
                 document.getElementById('pagamento-container').innerHTML = `
                     <div class="alert alert-error">
-                        ❌ Erro ao gerar PIX: ${error.message}
+                        ❌ Erro ao gerar PIX: ${error.message}<br>
+                        ${CONFIG.debug ? 'Detalhes: ' + JSON.stringify(error) : ''}
                     </div>
                 `;
             }
@@ -889,6 +948,7 @@
 
         function displayPaymentInfo(data) {
             const container = document.getElementById('pagamento-container');
+            debugLog('💳 Exibindo informações de pagamento');
             
             container.innerHTML = `
                 <div class="qr-container">
@@ -930,10 +990,12 @@
 
         function copyPixKey() {
             const pixKey = document.getElementById('pix-key').textContent;
+            debugLog('📋 Copiando chave PIX:', pixKey);
             
             if (navigator.clipboard) {
                 navigator.clipboard.writeText(pixKey).then(() => {
                     showTemporaryMessage('✅ Chave PIX copiada!');
+                    debugLog('✅ Chave PIX copiada via clipboard API');
                 });
             } else {
                 // Fallback para dispositivos mais antigos
@@ -944,6 +1006,7 @@
                 document.execCommand('copy');
                 document.body.removeChild(textArea);
                 showTemporaryMessage('✅ Chave PIX copiada!');
+                debugLog('✅ Chave PIX copiada via fallback');
             }
         }
 
@@ -960,7 +1023,9 @@
             document.body.appendChild(alertDiv);
             
             setTimeout(() => {
-                document.body.removeChild(alertDiv);
+                if (document.body.contains(alertDiv)) {
+                    document.body.removeChild(alertDiv);
+                }
             }, 3000);
         }
 
@@ -969,28 +1034,37 @@
                 clearInterval(pollInterval);
             }
 
+            debugLog('🔄 Iniciando polling de pagamento...');
+
             // Verificar a cada 5 segundos
             pollInterval = setInterval(async () => {
                 try {
+                    debugLog('🔍 Verificando status do pagamento...');
+                    
+                    const requestData = {
+                        mac: CONFIG.mac,
+                        mikrotik_id: CONFIG.mikrotik_id,
+                        plano_id: selectedPlan.id
+                    };
+
                     const response = await fetch(`${CONFIG.api_url}/verify`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({
-                            mac: CONFIG.mac,
-                            mikrotik_id: CONFIG.mikrotik_id,
-                            plano_id: selectedPlan.id
-                        })
+                        body: JSON.stringify(requestData)
                     });
 
                     const data = await response.json();
+                    debugLog('📊 Status do pagamento:', data);
                     
                     if (data.status === 'approved') {
                         clearInterval(pollInterval);
+                        debugLog('🎉 Pagamento aprovado!');
                         handlePaymentSuccess(data);
                     }
                 } catch (error) {
+                    debugLog('❌ Erro no polling:', error);
                     console.error('Erro no polling:', error);
                 }
             }, 5000);
@@ -999,12 +1073,14 @@
             setTimeout(() => {
                 if (pollInterval) {
                     clearInterval(pollInterval);
+                    debugLog('⏰ Polling interrompido após 10 minutos');
                 }
             }, 600000);
         }
 
         function handlePaymentSuccess(data) {
             closeAllModals();
+            debugLog('🎉 Processando pagamento aprovado:', data);
             
             showAlert('success', `🎉 Pagamento aprovado! Conectando automaticamente...<br>
                 <strong>Usuário:</strong> ${data.username}<br>
@@ -1013,9 +1089,19 @@
 
             // Auto-conectar após 3 segundos
             setTimeout(() => {
+                debugLog('🔐 Auto-conectando com credenciais...');
                 if (document.login) {
                     document.login.username.value = data.username;
                     document.login.submit();
+                    debugLog('✅ Formulário de login enviado');
+                } else {
+                    debugLog('❌ Formulário de login não encontrado');
                 }
             }, 3000);
         }
+
+        // Focar no input quando a página carregar
+        document.login.username.focus();
+    </script>
+</body>
+</html>
