@@ -902,27 +902,22 @@
         function getUrlParams() {
             const urlParams = new URLSearchParams(window.location.search);
             
-            // Get MikroTik data from URL parameters - REQUIRED
+            // Get MikroTik data from URL parameters
             state.mac = urlParams.get('mac');
             state.ip = urlParams.get('ip');
             state.interface = urlParams.get('interface');
             state.linkOrig = urlParams.get('link-orig');
             state.linkLogin = urlParams.get('link-login');
             
-            // Get configuration data - REQUIRED
+            // Get configuration data
             state.mikrotikId = urlParams.get('mikrotik_id');
             state.apiUrl = urlParams.get('api_url');
             state.debug = urlParams.get('debug') === 'true';
 
-            // Validate required parameters
-            if (!state.mac || !state.mikrotikId || !state.apiUrl) {
-                console.error('Parâmetros obrigatórios não fornecidos:', {
-                    mac: state.mac,
-                    mikrotikId: state.mikrotikId,
-                    apiUrl: state.apiUrl
-                });
-                alert('Erro: Parâmetros de configuração não encontrados. Contate o administrador.');
-                return;
+            // Validate only required parameters for API functionality
+            if (!state.mikrotikId || !state.apiUrl) {
+                console.warn('Parâmetros da API não fornecidos - funcionalidade limitada');
+                // Don't block the page, just log warning
             }
 
             updateDebugInfo();
@@ -930,30 +925,22 @@
             console.log('URL Parameters processed:', state);
         }
 
-        // Free Trial Function - Using MikroTik variables
+        // Free Trial Function - Using MikroTik variables only
         function activateFreeTrial() {
-            // Use MikroTik variables directly when available
-            const linkLogin = '$(link-login-only)' || state.linkLogin;
-            const linkOrig = '$(link-orig-esc)' || state.linkOrig;
-            const macEsc = '$(mac-esc)' || (state.mac ? state.mac.replace(/:/g, '') : '');
-            
-            if (linkLogin && linkLogin !== '$(link-login-only)') {
-                // MikroTik variables are available
-                const trialUrl = linkLogin + '?dst=' + linkOrig + '&username=T-' + macEsc;
-                window.location.href = trialUrl;
-            } else if (state.linkLogin && state.mac) {
-                // Fallback to JavaScript variables
-                const trialUrl = state.linkLogin + '?dst=' + encodeURIComponent(state.linkOrig || '') + '&username=T-' + state.mac.replace(/:/g, '');
-                window.location.href = trialUrl;
-            } else {
-                alert('Erro: Configuração do trial não encontrada');
-            }
+            // This function is only called when MikroTik variables are available
+            // The button is only shown with $(if trial == 'yes') condition
+            alert('Função de trial será executada pelo MikroTik');
         }
 
         // Plans Management
         async function loadPlans() {
             if (!state.apiUrl || !state.mikrotikId) {
-                alert('Erro: Configuração da API não encontrada');
+                console.warn('API não configurada - mostrando mensagem');
+                document.getElementById('plansContainer').innerHTML = 
+                    '<div style="text-align: center; padding: 20px; color: #666;">' +
+                    '<p>⚠️ Configuração da API não encontrada</p>' +
+                    '<p>Esta funcionalidade requer parâmetros da URL</p>' +
+                    '</div>';
                 return;
             }
 
@@ -1319,20 +1306,41 @@
         }
 
         // Event Listeners
-        document.getElementById('selectPlanBtn').addEventListener('click', () => {
-            showScreen('instructionsScreen');
+        document.addEventListener('DOMContentLoaded', function() {
+            const selectPlanBtn = document.getElementById('selectPlanBtn');
+            if (selectPlanBtn) {
+                selectPlanBtn.addEventListener('click', () => {
+                    if (state.selectedPlan) {
+                        showScreen('instructionsScreen');
+                    } else {
+                        alert('Por favor, selecione um plano primeiro.');
+                    }
+                });
+            }
         });
 
-        document.getElementById('continueBtn').addEventListener('click', () => {
-            generatePix();
-        });
-
-        document.getElementById('copyBtn').addEventListener('click', copyPixCode);
-
-        document.getElementById('connectBtn').addEventListener('click', () => {
-            const username = document.getElementById('successUsername').textContent;
-            const password = document.getElementById('successPassword').textContent;
-            loginAndRedirect(username, password);
+        document.addEventListener('DOMContentLoaded', function() {
+            const continueBtn = document.getElementById('continueBtn');
+            const copyBtn = document.getElementById('copyBtn');
+            const connectBtn = document.getElementById('connectBtn');
+            
+            if (continueBtn) {
+                continueBtn.addEventListener('click', () => {
+                    generatePix();
+                });
+            }
+            
+            if (copyBtn) {
+                copyBtn.addEventListener('click', copyPixCode);
+            }
+            
+            if (connectBtn) {
+                connectBtn.addEventListener('click', () => {
+                    const username = document.getElementById('successUsername').textContent;
+                    const password = document.getElementById('successPassword').textContent;
+                    loginAndRedirect(username, password);
+                });
+            }
         });
 
         // Focus on username input (like MikroTik example)
