@@ -1141,6 +1141,19 @@
             state.mikrotikId = urlParams.get('mikrotik_id') || null;
             state.apiUrl = urlParams.get('api_url') || null;
             state.debug = urlParams.get('debug') === 'true' || urlParams.get('debug') === '1';
+            
+            // Fix API URL - clean up the URL format
+            if (state.apiUrl) {
+                // Remove only trailing slashes
+                state.apiUrl = state.apiUrl.replace(/\/$/, '');
+                
+                // Ensure we have the correct base URL for api.lucro.top
+                if (state.apiUrl.includes('api.lucro.top')) {
+                    state.apiUrl = 'https://api.lucro.top';
+                }
+                
+                console.log('API URL configured:', state.apiUrl);
+            }
 
             // Get additional MikroTik variables if present
             const chapId = urlParams.get('chap-id') || urlParams.get('chapId') || null;
@@ -1218,9 +1231,12 @@
             }
 
             try {
-                const response = await fetch(state.apiUrl + '/api/planos/' + state.mikrotikId, {
-                    method: 'GET',
-                    headers: { 'Content-Type': 'application/json' }
+                const response = await fetch(state.apiUrl + '/api/captive-check/planos', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        mikrotik_id: state.mikrotikId
+                    })
                 });
                 
                 if (!response.ok) {
@@ -1434,7 +1450,7 @@
             showLoading('Gerando PIX...', 'Criando seu pagamento personalizado');
 
             try {
-                const response = await fetch(state.apiUrl + '/api/pix', {
+                const response = await fetch(state.apiUrl + '/api/captive-check/pix', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1524,7 +1540,7 @@
             if (!state.paymentId || !state.apiUrl) return;
             
             try {
-                const response = await fetch(state.apiUrl + '/api/poll-payment', {
+                const response = await fetch(state.apiUrl + '/api/captive-check/poll-payment', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
