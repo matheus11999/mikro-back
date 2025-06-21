@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PIX Mikro - Acesso à Internet</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .captive-container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+        }
+
+        .logo {
+            margin-bottom: 30px;
+        }
+
+        .logo h1 {
+            color: #667eea;
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .logo p {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .welcome-text {
+            margin-bottom: 30px;
+        }
+
+        .welcome-text h2 {
+            color: #333;
+            font-size: 1.8rem;
+            margin-bottom: 15px;
+        }
+
+        .welcome-text p {
+            color: #666;
+            font-size: 1rem;
+            line-height: 1.6;
+        }
+
+        .plans-container {
+            margin-bottom: 30px;
+        }
+
+        .plan-card {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .plan-card:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+        }
+
+        .plan-card.selected {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .plan-name {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .plan-price {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .plan-details {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .connect-btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 15px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            margin-bottom: 20px;
+        }
+
+        .connect-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .connect-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .mac-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .template-info {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .loading {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="template-info">
+        Template 1 - Captive Portal
+    </div>
+
+    <div class="captive-container">
+        <div class="logo">
+            <h1>🌐 PIX Mikro</h1>
+            <p>Acesso Rápido à Internet</p>
+        </div>
+
+        <div class="welcome-text">
+            <h2>Bem-vindo!</h2>
+            <p>Escolha um plano abaixo para acessar a internet. O pagamento é feito via PIX de forma rápida e segura.</p>
+        </div>
+
+        <div class="plans-container" id="plansContainer">
+            <div class="plan-card" data-plan="1" onclick="selectPlan(1)">
+                <div class="plan-name">Plano 1 Hora</div>
+                <div class="plan-price">R$ 5,00</div>
+                <div class="plan-details">• 1 hora de acesso<br>• Velocidade 5Mbps<br>• Navegação ilimitada</div>
+            </div>
+
+            <div class="plan-card" data-plan="2" onclick="selectPlan(2)">
+                <div class="plan-name">Plano 2 Horas</div>
+                <div class="plan-price">R$ 8,00</div>
+                <div class="plan-details">• 2 horas de acesso<br>• Velocidade 10Mbps<br>• Navegação ilimitada</div>
+            </div>
+
+            <div class="plan-card" data-plan="3" onclick="selectPlan(3)">
+                <div class="plan-name">Plano Dia Todo</div>
+                <div class="plan-price">R$ 15,00</div>
+                <div class="plan-details">• 24 horas de acesso<br>• Velocidade 20Mbps<br>• Navegação ilimitada</div>
+            </div>
+        </div>
+
+        <button class="connect-btn" id="connectBtn" onclick="generatePix()" disabled>
+            Gerar PIX e Conectar
+        </button>
+
+        <div class="loading" id="loading">
+            <div class="loading-spinner"></div>
+            <p style="margin-top: 15px; color: #667eea;">Gerando PIX...</p>
+        </div>
+
+        <div class="mac-info">
+            <strong>Seu dispositivo:</strong> <span id="macAddress">AA:BB:CC:DD:EE:FF</span><br>
+            <small>Template: 1 (Moderno) • Mikrotik ID: demo-001</small>
+        </div>
+    </div>
+
+    <script>
+        let selectedPlan = null;
+        const plans = {
+            1: { name: 'Plano 1 Hora', price: 5.00, duration: 60 },
+            2: { name: 'Plano 2 Horas', price: 8.00, duration: 120 },
+            3: { name: 'Plano Dia Todo', price: 15.00, duration: 1440 }
+        };
+
+        function selectPlan(planId) {
+            document.querySelectorAll('.plan-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+
+            document.querySelector(`[data-plan="${planId}"]`).classList.add('selected');
+            
+            selectedPlan = planId;
+            document.getElementById('connectBtn').disabled = false;
+        }
+
+        function generatePix() {
+            if (!selectedPlan) {
+                alert('Por favor, selecione um plano primeiro!');
+                return;
+            }
+
+            const plan = plans[selectedPlan];
+            
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('connectBtn').disabled = true;
+
+            setTimeout(() => {
+                document.getElementById('loading').style.display = 'none';
+                
+                alert(
+                    `PIX Gerado com Sucesso!\n\n` +
+                    `Plano: ${plan.name}\n` +
+                    `Valor: R$ ${plan.price.toFixed(2)}\n` +
+                    `Duração: ${plan.duration} minutos\n\n` +
+                    `Template: 1 (Moderno)\n` +
+                    `Status: Aguardando pagamento...`
+                );
+                
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('connectBtn').textContent = 'Verificar Pagamento';
+            }, 2000);
+        }
+
+        function generateMacAddress() {
+            const chars = '0123456789ABCDEF';
+            let mac = '';
+            for (let i = 0; i < 6; i++) {
+                if (i > 0) mac += ':';
+                mac += chars[Math.floor(Math.random() * 16)];
+                mac += chars[Math.floor(Math.random() * 16)];
+            }
+            return mac;
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('macAddress').textContent = generateMacAddress();
+        });
+    </script>
+</body>
+</html> 

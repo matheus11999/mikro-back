@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 require('dotenv').config();
 const path = require('path');
+const fs = require('fs');
 
 // Validação de variáveis de ambiente (apenas aviso, não para execução)
 const requiredEnvVars = [
@@ -1274,6 +1275,111 @@ app.get('/api/recent-sales/:mikrotik_id', async (req, res, next) => {
     next(err);
   }
 });
+
+// Rota para servir templates HTML
+app.get('/api/templates/:templateId/:filename', async (req, res, next) => {
+  try {
+    const { templateId, filename } = req.params;
+    
+    // Validar parâmetros
+    if (!templateId || !filename) {
+      return res.status(400).json({
+        error: 'templateId e filename obrigatórios',
+        code: 'VALIDATION_ERROR',
+        details: 'Informe o ID do template e o nome do arquivo'
+      });
+    }
+
+    // Validar templateId é numérico
+    if (!/^\d+$/.test(templateId)) {
+      return res.status(400).json({
+        error: 'templateId deve ser numérico',
+        code: 'INVALID_TEMPLATE_ID',
+        details: 'O ID do template deve conter apenas números'
+      });
+    }
+
+    // Validar filename termina com .html
+    if (!filename.endsWith('.html')) {
+      return res.status(400).json({
+        error: 'Arquivo deve ser HTML',
+        code: 'INVALID_FILE_TYPE',
+        details: 'Apenas arquivos .html são permitidos'
+      });
+    }
+
+    // Construir caminho do arquivo
+    const templatePath = path.join(__dirname, 'templates', templateId, filename);
+    
+    // Verificar se o arquivo existe
+    if (!fs.existsSync(templatePath)) {
+      return res.status(404).json({
+        error: 'Template não encontrado',
+        code: 'TEMPLATE_NOT_FOUND',
+        details: `Template ${templateId}/${filename} não existe`,
+        available_templates: getAvailableTemplates()
+      });
+    }
+
+    console.log(`[TEMPLATES] Servindo: ${templateId}/${filename}`);
+    
+    // Servir o arquivo HTML
+    res.sendFile(templatePath);
+
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Endpoint para listar templates disponíveis
+app.get('/api/templates', async (req, res, next) => {
+  try {
+    const templates = getAvailableTemplates();
+    
+    return res.json({
+      message: 'Templates disponíveis',
+      templates: templates,
+      total: templates.length,
+      usage: 'GET /api/templates/{templateId}/{filename}.html'
+    });
+    
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Função para listar templates disponíveis
+function getAvailableTemplates() {
+  const templatesDir = path.join(__dirname, 'templates');
+  const templates = [];
+  
+  try {
+    if (fs.existsSync(templatesDir)) {
+      const templateFolders = fs.readdirSync(templatesDir);
+      
+      templateFolders.forEach(folderId => {
+        const folderPath = path.join(templatesDir, folderId);
+        if (fs.statSync(folderPath).isDirectory()) {
+          const files = fs.readdirSync(folderPath)
+            .filter(file => file.endsWith('.html'));
+          
+          if (files.length > 0) {
+            templates.push({
+              id: folderId,
+              name: `Template ${folderId}`,
+              files: files,
+              urls: files.map(file => `/api/templates/${folderId}/${file}`)
+            });
+          }
+        }
+      });
+    }
+  } catch (error) {
+    console.error('[TEMPLATES] Erro ao listar templates:', error);
+  }
+  
+  return templates;
+}
 
 // Registra o middleware de erro no final
 app.use(errorHandler);
