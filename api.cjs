@@ -47,39 +47,13 @@ const handleMercadoPagoFetch = async (url, options = {}) => {
   return await response.json();
 };
 
-// Middleware de tratamento de erros
-const errorHandler = (err, req, res, next) => {
-  console.error('Error:', err);
-  
-  if (err.code === 'VALIDATION_ERROR') {
-    return res.status(400).json({
-      error: err.message,
-      code: err.code,
-      details: err.details
-    });
-  }
-  
-  if (err.code === 'NOT_FOUND') {
-    return res.status(404).json({
-      error: err.message,
-      code: err.code
-    });
-  }
-  
-  res.status(500).json({
-    error: 'Erro interno do servidor',
-    code: 'INTERNAL_ERROR',
-    message: err.message
-  });
-};
-
-app.use(errorHandler);
-
 // ENDPOINTS
 
 // 1. Listar planos (sem verificação de senhas)
 app.get('/api/planos', async (req, res, next) => {
   try {
+    console.log('[PLANOS] Consultando planos disponíveis...');
+    
     const planos = await handleSupabaseOperation(() =>
       supabaseAdmin
         .from('planos')
@@ -87,11 +61,21 @@ app.get('/api/planos', async (req, res, next) => {
         .order('preco', { ascending: true })
     );
 
+    if (!planos || planos.length === 0) {
+      console.log('[PLANOS] Nenhum plano encontrado');
+      return res.json({
+        planos: [],
+        total: 0
+      });
+    }
+
     // Sistema sem senhas - todos os planos estão sempre disponíveis
     const planosFormatados = planos.map(plano => ({
       ...plano,
       disponivel: true // Sistema baseado apenas em MAC
     }));
+
+    console.log(`[PLANOS] Retornando ${planosFormatados.length} planos`);
 
     return res.json({
       planos: planosFormatados,
@@ -99,6 +83,7 @@ app.get('/api/planos', async (req, res, next) => {
     });
 
   } catch (err) {
+    console.error('[PLANOS] Erro:', err);
     next(err);
   }
 });
@@ -438,16 +423,19 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
       };
     }
 
+    console.log('[PIX] Validações OK, buscando/criando MAC...');
+
     // Busca ou cria MAC
     let macObj = await handleSupabaseOperation(() =>
       supabaseAdmin
         .from('macs')
         .select('id')
         .eq('mac_address', mac)
-        .single()
+        .maybeSingle()
     );
 
     if (!macObj) {
+      console.log('[PIX] MAC não encontrado, criando novo...');
       macObj = await handleSupabaseOperation(() =>
         supabaseAdmin
           .from('macs')
@@ -460,9 +448,13 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
           .select('id')
           .single()
       );
+      console.log('[PIX] MAC criado com ID:', macObj.id);
+    } else {
+      console.log('[PIX] MAC encontrado com ID:', macObj.id);
     }
 
     // Verifica se já existe venda pendente
+    console.log('[PIX] Verificando vendas pendentes...');
     const vendaPendente = await handleSupabaseOperation(() =>
       supabaseAdmin
         .from('vendas')
@@ -476,15 +468,19 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
     );
 
     if (vendaPendente && vendaPendente.length > 0) {
+      console.log('[PIX] Venda pendente encontrada, retornando erro');
       return res.status(400).json({
         error: 'Já existe um pagamento pendente para este MAC/plano/mikrotik.',
         code: 'PENDING_PAYMENT_EXISTS'
       });
     }
 
+    console.log('[PIX] Nenhuma venda pendente, prosseguindo...');
+
     // Sistema sem senhas - sempre permite gerar PIX
 
     // Verifica plano
+    console.log('[PIX] Verificando plano...');
     const plano = await handleSupabaseOperation(() =>
       supabaseAdmin
         .from('planos')
@@ -502,7 +498,10 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
       };
     }
 
+    console.log('[PIX] Plano encontrado:', plano.nome);
+
     // Verifica mikrotik
+    console.log('[PIX] Verificando mikrotik...');
     const mikrotik = await handleSupabaseOperation(() =>
       supabaseAdmin
         .from('mikrotiks')
@@ -519,6 +518,8 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
         source: 'API'
       };
     }
+
+    console.log('[PIX] Mikrotik encontrado, gerando pagamento...');
 
     // Monta o corpo da requisição
     const paymentData = {
@@ -542,7 +543,7 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
       }
     };
 
-    console.log('[PIX] Gerando pagamento:', paymentData);
+    console.log('[PIX] Chamando Mercado Pago...');
 
     const idempotencyKey = `pix-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -554,9 +555,10 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
       body: JSON.stringify(paymentData)
     });
 
-    console.log('[PIX] Gerado com sucesso, payment_id:', mpData.id);
+    console.log('[PIX] Pagamento criado no MP, payment_id:', mpData.id);
 
     // Salva venda
+    console.log('[PIX] Salvando venda no banco...');
     await handleSupabaseOperation(() =>
       supabaseAdmin
         .from('vendas')
@@ -577,6 +579,8 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
         }])
     );
 
+    console.log('[PIX] Venda salva com sucesso!');
+
     // Retorna resposta
     return res.json({
       ...mpData,
@@ -586,6 +590,7 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
     });
 
   } catch (err) {
+    console.error('[PIX] Erro:', err);
     next(err);
   }
 });
@@ -711,7 +716,74 @@ app.post('/api/webhook/mercadopago', async (req, res, next) => {
   }
 });
 
-// 5. Recent Sales (MACs desconectados de vendas aprovadas há 1 minuto)
+// 5.1. Recent Sales JSON (para compatibilidade com scripts Mikrotik)
+app.get('/api/recent-sales-json/:mikrotik_id', async (req, res, next) => {
+  try {
+    const { mikrotik_id } = req.params;
+
+    if (!mikrotik_id) {
+      throw {
+        message: 'mikrotik_id obrigatório',
+        code: 'VALIDATION_ERROR',
+        details: 'O ID do Mikrotik é obrigatório',
+        source: 'API'
+      };
+    }
+
+    console.log('[RECENT-SALES-JSON] Buscando vendas dos últimos 2 minutos para mikrotik:', mikrotik_id);
+
+    // Data dos últimos 2 minutos
+    const agora = new Date();
+    const doisMinutosAtras = new Date(agora.getTime() - 2 * 60 * 1000);
+
+    // Buscar vendas aprovadas dos últimos 2 minutos para MACs que estão DESCONECTADOS
+    const vendas = await handleSupabaseOperation(() =>
+      supabaseAdmin
+        .from('vendas')
+        .select(`
+          *,
+          mac_id (mac_address, status),
+          plano_id (nome, duracao)
+        `)
+        .eq('mikrotik_id', mikrotik_id)
+        .eq('status', 'aprovado')
+        .gte('pagamento_aprovado_em', doisMinutosAtras.toISOString())
+        .order('pagamento_aprovado_em', { ascending: false })
+    );
+
+    if (!vendas || vendas.length === 0) {
+      console.log('[RECENT-SALES-JSON] Nenhuma venda encontrada nos últimos 2 minutos');
+      return res.json([]);
+    }
+
+    // Filtrar apenas MACs que estão DESCONECTADOS
+    const vendasDesconectadas = vendas.filter(venda => {
+      const statusMac = venda.mac_id?.status;
+      const isDesconectado = !statusMac || statusMac === 'coletado' || statusMac === 'desconectado' || statusMac === 'precisa_comprar';
+      return isDesconectado;
+    });
+
+    if (vendasDesconectadas.length === 0) {
+      console.log('[RECENT-SALES-JSON] Todas as vendas são de MACs já conectados');
+      return res.json([]);
+    }
+
+    // Formato JSON para Mikrotik
+    const macs = vendasDesconectadas.map(venda => ({
+      mac: venda.mac_id.mac_address,
+      minutos: venda.plano_id?.duracao || 60
+    }));
+
+    console.log(`[RECENT-SALES-JSON] Enviando ${macs.length} MACs desconectados`);
+    return res.json(macs);
+
+  } catch (err) {
+    console.error('[RECENT-SALES-JSON] Erro:', err);
+    return res.json([]);
+  }
+});
+
+// 5. Recent Sales (MACs desconectados de vendas aprovadas há 2 minutos)
 app.get('/api/recent-sales/:mikrotik_id', async (req, res, next) => {
   try {
     const { mikrotik_id } = req.params;
@@ -725,50 +797,67 @@ app.get('/api/recent-sales/:mikrotik_id', async (req, res, next) => {
       };
     }
 
-    console.log('[RECENT-SALES] Buscando vendas do último minuto para mikrotik:', mikrotik_id);
+    console.log('[RECENT-SALES] Buscando vendas dos últimos 2 minutos para mikrotik:', mikrotik_id);
 
-    // Data do último minuto
+    // Data dos últimos 2 minutos
     const agora = new Date();
-    const umMinutoAtras = new Date(agora.getTime() - 1 * 60 * 1000);
+    const doisMinutosAtras = new Date(agora.getTime() - 2 * 60 * 1000); // 2 minutos atrás
 
-    // Buscar vendas aprovadas do último minuto para MACs que estão DESCONECTADOS
+    // Buscar vendas aprovadas dos últimos 2 minutos para MACs que estão DESCONECTADOS
     const vendas = await handleSupabaseOperation(() =>
       supabaseAdmin
         .from('vendas')
         .select(`
           *,
           mac_id (mac_address, status),
+          senha_id (usuario, senha),
           plano_id (nome, duracao)
         `)
         .eq('mikrotik_id', mikrotik_id)
         .eq('status', 'aprovado')
-        .gte('pagamento_aprovado_em', umMinutoAtras.toISOString())
+        .gte('pagamento_aprovado_em', doisMinutosAtras.toISOString())
         .order('pagamento_aprovado_em', { ascending: false })
     );
 
     if (!vendas || vendas.length === 0) {
-      console.log('[RECENT-SALES] Nenhuma venda encontrada no último minuto');
+      console.log('[RECENT-SALES] Nenhuma venda encontrada nos últimos 2 minutos');
       return res.send('');
     }
 
-    // Filtrar apenas MACs desconectados
-    const vendasDesconectadas = vendas.filter(venda => 
-      venda.mac_id && venda.mac_id.status === 'desconectado'
-    );
+    // Filtrar apenas MACs que estão DESCONECTADOS
+    const vendasDesconectadas = vendas.filter(venda => {
+      const statusMac = venda.mac_id?.status;
+      const isDesconectado = !statusMac || statusMac === 'coletado' || statusMac === 'desconectado' || statusMac === 'precisa_comprar';
+      
+      if (isDesconectado) {
+        console.log(`[RECENT-SALES] MAC ${venda.mac_id?.mac_address} está desconectado (status: ${statusMac}) - incluindo na lista`);
+      } else {
+        console.log(`[RECENT-SALES] MAC ${venda.mac_id?.mac_address} está conectado (status: ${statusMac}) - ignorando`);
+      }
+      
+      return isDesconectado;
+    });
 
     if (vendasDesconectadas.length === 0) {
-      console.log('[RECENT-SALES] Nenhum MAC desconectado encontrado');
+      console.log('[RECENT-SALES] Todas as vendas são de MACs já conectados');
       return res.send('');
     }
 
-    // Montar resposta no formato JSON para Mikrotik
-    const macs = vendasDesconectadas.map(venda => ({
-      mac: venda.mac_id.mac_address,
-      minutos: venda.plano_id?.duracao || 60
-    }));
+    // Formatar dados no formato solicitado: user-senha-mac-minutos
+    const vendasFormatadas = vendasDesconectadas.map(venda => {
+      const usuario = venda.senha_id?.usuario || 'N/A';
+      const senha = venda.senha_id?.senha || 'N/A';
+      const mac = venda.mac_id?.mac_address || 'N/A';
+      const minutos = venda.plano_id?.duracao || 60;
+      
+      return `${usuario}-${senha}-${mac}-${minutos}`;
+    });
 
-    console.log('[RECENT-SALES] Enviando MACs:', macs);
-    return res.send(JSON.stringify(macs));
+    console.log(`[RECENT-SALES] Encontradas ${vendas.length} vendas totais, ${vendasDesconectadas.length} de MACs desconectados`);
+
+    // Retornar apenas texto puro, uma venda por linha
+    res.set('Content-Type', 'text/plain');
+    return res.send(vendasFormatadas.join('\n'));
 
   } catch (err) {
     console.error('[RECENT-SALES] Erro:', err);
@@ -824,11 +913,37 @@ app.post('/api/mikrotik/auth-notification', async (req, res, next) => {
   }
 });
 
-// Middleware final
-app.use((req, res) => {
+// Middleware final de 404
+app.use((req, res, next) => {
   res.status(404).json({
     error: 'Endpoint não encontrado',
     code: 'NOT_FOUND'
+  });
+});
+
+// Middleware de tratamento de erros (DEVE FICAR POR ÚLTIMO)
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  
+  if (err.code === 'VALIDATION_ERROR') {
+    return res.status(400).json({
+      error: err.message,
+      code: err.code,
+      details: err.details
+    });
+  }
+  
+  if (err.code === 'NOT_FOUND') {
+    return res.status(404).json({
+      error: err.message,
+      code: err.code
+    });
+  }
+  
+  res.status(500).json({
+    error: 'Erro interno do servidor',
+    code: 'INTERNAL_ERROR',
+    message: err.message
   });
 });
 
@@ -837,7 +952,7 @@ app.listen(PORT, () => {
   console.log(`🚀 API sem senhas rodando na porta ${PORT}`);
   console.log('📡 Sistema baseado apenas em MAC addresses');
   console.log('💰 PIX integrado com Mercado Pago');
-  console.log('API sem senhas iniciando...');
+  console.log('✅ Todos os endpoints carregados corretamente');
 });
 
 module.exports = app; 
