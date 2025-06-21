@@ -49,10 +49,10 @@ const handleMercadoPagoFetch = async (url, options = {}) => {
 
 // ENDPOINTS
 
-// 1. Listar planos (sem verificação de senhas)
+// Endpoint GET /api/planos (para compatibilidade com frontend)
 app.get('/api/planos', async (req, res, next) => {
   try {
-    console.log('[PLANOS] Consultando planos disponíveis...');
+    console.log('[PLANOS] Consultando todos os planos disponíveis...');
     
     const planos = await handleSupabaseOperation(() =>
       supabaseAdmin
@@ -80,6 +80,52 @@ app.get('/api/planos', async (req, res, next) => {
     return res.json({
       planos: planosFormatados,
       total: planosFormatados.length
+    });
+
+  } catch (err) {
+    console.error('[PLANOS] Erro:', err);
+    next(err);
+  }
+});
+
+// Endpoint POST /api/captive-check/planos (mantido para compatibilidade com Mikrotik)
+app.post('/api/captive-check/planos', async (req, res, next) => {
+  try {
+    const { mikrotik_id } = req.body;
+
+    console.log('[PLANOS] Buscando planos para mikrotik:', mikrotik_id);
+
+    let query = supabaseAdmin
+      .from('planos')
+      .select('*')
+      .order('preco');
+
+    // Se mikrotik_id fornecido, filtra por ele, senão retorna todos
+    if (mikrotik_id) {
+      query = query.eq('mikrotik_id', mikrotik_id);
+    }
+
+    const planos = await handleSupabaseOperation(() => query);
+
+    if (!planos || planos.length === 0) {
+      return res.json({
+        planos: [],
+        message: mikrotik_id ? 'Nenhum plano disponível para este mikrotik' : 'Nenhum plano disponível'
+      });
+    }
+
+    // Sistema sem senhas - todos os planos estão sempre disponíveis
+    const planosComDisponibilidade = planos.map(plano => ({
+      ...plano,
+      senhas_disponiveis: 999, // Valor fixo para compatibilidade
+      disponivel: true // Sempre disponível sem verificação de senhas
+    }));
+
+    console.log(`[PLANOS] Retornando ${planosComDisponibilidade.length} planos`);
+
+    return res.json({
+      planos: planosComDisponibilidade,
+      total: planosComDisponibilidade.length
     });
 
   } catch (err) {
@@ -453,8 +499,7 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
       console.log('[PIX] MAC encontrado com ID:', macObj.id);
     }
 
-    // Verifica se já existe venda pendente
-    console.log('[PIX] Verificando vendas pendentes...');
+    // Verifica se já existe venda pendente para este MAC/plano/mikrotik
     const vendaPendente = await handleSupabaseOperation(() =>
       supabaseAdmin
         .from('vendas')
@@ -466,21 +511,16 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
         .order('pagamento_gerado_em', { ascending: false })
         .limit(1)
     );
-
     if (vendaPendente && vendaPendente.length > 0) {
-      console.log('[PIX] Venda pendente encontrada, retornando erro');
       return res.status(400).json({
         error: 'Já existe um pagamento pendente para este MAC/plano/mikrotik.',
         code: 'PENDING_PAYMENT_EXISTS'
       });
     }
-
-    console.log('[PIX] Nenhuma venda pendente, prosseguindo...');
-
-    // Sistema sem senhas - sempre permite gerar PIX
+    
+    // Sistema sem senhas - sempre permite gerar PIX (removido verificação de senhas)
 
     // Verifica plano
-    console.log('[PIX] Verificando plano...');
     const plano = await handleSupabaseOperation(() =>
       supabaseAdmin
         .from('planos')
@@ -865,50 +905,160 @@ app.get('/api/recent-sales/:mikrotik_id', async (req, res, next) => {
   }
 });
 
-// 6. Mikrotik Auth Notification
+// Endpoint para receber notificações de autenticação do Mikrotik
 app.post('/api/mikrotik/auth-notification', async (req, res, next) => {
   try {
-    const { token, mac_address, mikrotik_id, action } = req.body;
-
-    console.log('[AUTH-NOTIFICATION] Recebido:', { token, mac_address, mikrotik_id, action });
-
-    if (!token || !mac_address || !mikrotik_id || !action) {
-      return res.status(400).json({
-        error: 'Parâmetros obrigatórios: token, mac_address, mikrotik_id, action'
-      });
-    }
-
-    // Verifica token de autorização
-    const expectedToken = "MkT_Auth_2024_Secure_Token_x9K2mP7qR5nL8vB3";
-    if (token !== expectedToken) {
-      return res.status(401).json({
-        error: 'Token de autorização inválido'
-      });
-    }
-
-    // Atualiza status do MAC
-    const newStatus = action === 'connect' ? 'conectado' : 'desconectado';
+    const { token, mac_address, mikrotik_id, action, usuario, ip_address } = req.body;
     
-    await handleSupabaseOperation(() =>
+    console.log('[MIKROTIK AUTH] Notificação recebida:', { 
+      mac_address, 
+      mikrotik_id, 
+      action, 
+      usuario, 
+      ip_address,
+      timestamp: new Date().toISOString()
+    });
+
+    // Token de segurança
+    const expectedToken = "MkT_Auth_2024_Secure_Token_x9K2mP7qR5nL8vB3";
+    
+    if (!token || token !== expectedToken) {
+      console.error('[MIKROTIK AUTH] Token inválido:', token);
+      return res.status(401).json({
+        error: 'Token de autorização inválido',
+        code: 'UNAUTHORIZED'
+      });
+    }
+
+    // Validação de campos obrigatórios
+    if (!mac_address || !mikrotik_id || !action) {
+      throw {
+        message: 'Campos obrigatórios ausentes',
+        code: 'VALIDATION_ERROR',
+        details: 'mac_address, mikrotik_id e action são obrigatórios',
+        source: 'API'
+      };
+    }
+
+    // Validar formato do MAC
+    if (!isValidMac(mac_address)) {
+      throw {
+        message: 'MAC address inválido',
+        code: 'VALIDATION_ERROR',
+        details: 'Formato esperado: XX:XX:XX:XX:XX:XX',
+        source: 'API'
+      };
+    }
+
+    // Buscar MAC no banco de dados
+    const macs = await handleSupabaseOperation(() =>
       supabaseAdmin
         .from('macs')
-        .update({
-          status: newStatus,
-          ultimo_acesso: new Date().toISOString()
-        })
+        .select('*')
         .eq('mac_address', mac_address)
         .eq('mikrotik_id', mikrotik_id)
     );
 
-    console.log(`[AUTH-NOTIFICATION] MAC ${mac_address} atualizado para ${newStatus}`);
+    let macObj = macs && macs[0];
 
+    // Se MAC não existe, cria um novo registro
+    if (!macObj) {
+      console.log('[MIKROTIK AUTH] MAC não encontrado, criando novo registro:', mac_address);
+      
+      macObj = await handleSupabaseOperation(() =>
+        supabaseAdmin
+          .from('macs')
+          .insert([{
+            mac_address,
+            mikrotik_id,
+            status: 'desconectado',
+            primeiro_acesso: new Date().toISOString(),
+            ultimo_acesso: null,
+            total_compras: 0,
+            ultimo_plano: '',
+            ultimo_valor: 0,
+            total_gasto: 0,
+            status_pagamento: 'aguardando'
+          }])
+          .select()
+          .single()
+      );
+    }
+
+    // Determinar novo status baseado na ação
+    let novoStatus = macObj.status;
+    const agora = new Date().toISOString();
+
+    switch (action.toLowerCase()) {
+      case 'login':
+      case 'connect':
+      case 'authenticated':
+        novoStatus = 'conectado';
+        break;
+      case 'logout':
+      case 'disconnect':
+      case 'disconnected':
+        novoStatus = 'desconectado';
+        break;
+      default:
+        console.warn('[MIKROTIK AUTH] Ação desconhecida:', action);
+        novoStatus = 'desconectado';
+    }
+
+    console.log('[MIKROTIK AUTH] Atualizando status:', {
+      mac: mac_address,
+      statusAnterior: macObj.status,
+      novoStatus,
+      action
+    });
+
+    // Preparar dados para atualização (apenas campos essenciais)
+    const dadosAtualizacao = {
+      status: novoStatus,
+      ultimo_acesso: agora
+    };
+
+    // Atualizar MAC no banco
+    const macAtualizado = await handleSupabaseOperation(() =>
+      supabaseAdmin
+        .from('macs')
+        .update(dadosAtualizacao)
+        .eq('id', macObj.id)
+        .select()
+        .single()
+    );
+
+    // Log simples no console (sem tabela de auditoria)
+    console.log('[MIKROTIK AUTH] Ação processada:', {
+      mac_address,
+      action,
+      usuario: usuario || 'N/A',
+      status_anterior: macObj.status,
+      status_novo: novoStatus,
+      timestamp: agora
+    });
+
+    console.log('[MIKROTIK AUTH] MAC atualizado com sucesso:', {
+      id: macAtualizado.id,
+      mac_address: macAtualizado.mac_address,
+      status: macAtualizado.status,
+      ultimo_acesso: macAtualizado.ultimo_acesso
+    });
+
+    // Resposta de sucesso
     return res.json({
       success: true,
-      message: `MAC ${mac_address} ${newStatus}`,
-      timestamp: new Date().toISOString()
+      message: 'Autenticação registrada com sucesso',
+      data: {
+        mac_address: macAtualizado.mac_address,
+        status_anterior: macObj.status,
+        status_atual: macAtualizado.status,
+        action_processada: action
+      }
     });
 
   } catch (err) {
+    console.error('[MIKROTIK AUTH] Erro ao processar notificação:', err);
     next(err);
   }
 });
