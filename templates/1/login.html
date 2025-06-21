@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     <meta http-equiv="pragma" content="no-cache" />
-    <meta http-equiv="expires" content="-1" />
+    <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="expires" content="0" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0; maximum-scale=1.0;"/>
+    <meta name="robots" content="noindex, nofollow" />
     <title>WiFi Premium - Conexão Rápida</title>
     <style>
         * {
@@ -906,25 +908,7 @@
     </div>
 
     <script>
-        // Global state
-        const state = {
-            mac: null,
-            ip: null,
-            interface: null,
-            linkOrig: null,
-            linkLogin: null,
-            mikrotikId: null,
-            apiUrl: null,
-            debug: false,
-            selectedPlan: null,
-            paymentId: null,
-            checkInterval: null,
-            timerInterval: null,
-            startTime: null,
-            trialActivated: false,
-            plans: [],
-            isLoading: false
-        };
+
 
         // Loading Management
         function showLoading(text = 'Carregando...', subtext = 'Aguarde um momento') {
@@ -991,9 +975,61 @@
             }
         }
 
-        // MikroTik CHAP Authentication - only add if chap-id exists
+        // Global state
+        const state = {
+            mac: null,
+            ip: null,
+            interface: null,
+            linkOrig: null,
+            linkLogin: null,
+            mikrotikId: null,
+            apiUrl: null,
+            debug: false,
+            selectedPlan: null,
+            paymentId: null,
+            checkInterval: null,
+            timerInterval: null,
+            startTime: null,
+            trialActivated: false,
+            plans: [],
+            isLoading: false,
+            isMikroTikEnvironment: false
+        };
+
+        // Detect environment and initialize
+        function detectEnvironment() {
+            // Check if we're running on MikroTik by checking if variables are processed
+            const chapId = '$(chap-id)';
+            const linkLogin = '$(link-login-only)';
+            
+            // If variables still contain $( they weren't processed by MikroTik
+            state.isMikroTikEnvironment = !chapId.includes('$(') && !linkLogin.includes('$(');
+            
+            console.log('Environment detected:', state.isMikroTikEnvironment ? 'MikroTik' : 'External API');
+            
+            if (state.isMikroTikEnvironment) {
+                // Running on MikroTik - variables are available
+                setupMikroTikEnvironment();
+            } else {
+                // Running on external API - get parameters from URL
+                getUrlParams();
+            }
+        }
+
+        function setupMikroTikEnvironment() {
+            // When running on MikroTik, variables are processed
+            state.mac = '$(mac)';
+            state.ip = '$(ip)';
+            state.interface = '$(interface-name)';
+            state.linkOrig = '$(link-orig)';
+            state.linkLogin = '$(link-login-only)';
+            
+            console.log('MikroTik environment setup complete');
+        }
+
+        // MikroTik CHAP Authentication
         function doLogin() {
-            if (document.sendin) {
+            if (document.sendin && document.login) {
                 document.sendin.username.value = document.login.username.value;
                 document.sendin.password.value = document.login.username.value;
                 document.sendin.submit();
@@ -1015,6 +1051,12 @@
         }
 
         function showPlansScreen() {
+            // Check if we have API configuration
+            if (!state.apiUrl || !state.mikrotikId) {
+                showMessage('⚠️ Funcionalidade PIX disponível apenas com configuração da API', 'warning');
+                return;
+            }
+            
             setButtonLoading('buyPixBtn', true);
             showLoading('Carregando planos...', 'Buscando opções disponíveis');
             
@@ -1081,11 +1123,17 @@
             console.log('URL Parameters processed:', state);
         }
 
-        // Free Trial Function - Using MikroTik variables only
+        // Free Trial Function
         function activateFreeTrial() {
-            // This function is only called when MikroTik variables are available
-            // The button is only shown with $(if trial == 'yes') condition
-            alert('Função de trial será executada pelo MikroTik');
+            if (state.isMikroTikEnvironment) {
+                // Running on MikroTik - use native trial link
+                const trialLink = '$(link-login-only)?dst=$(link-orig-esc)&username=T-$(mac-esc)';
+                console.log('Activating MikroTik trial:', trialLink);
+                window.location.href = trialLink;
+            } else {
+                // Running on external API - show message
+                showMessage('🎁 Função de trial disponível apenas quando servido pelo MikroTik', 'info');
+            }
         }
 
         // Plans Management
@@ -1178,6 +1226,8 @@
         }
 
         function selectPlan(planId) {
+            console.log('Selecting plan:', planId);
+            
             // Remove previous selection
             document.querySelectorAll('.plan-card').forEach(card => {
                 card.classList.remove('selected');
@@ -1185,17 +1235,27 @@
             
             // Add selection to clicked plan
             const planCard = document.querySelector('[data-plan-id="' + planId + '"]');
-            planCard.classList.add('selected');
+            if (planCard) {
+                planCard.classList.add('selected');
+                console.log('Plan card selected:', planCard);
+            }
             
             // Store selected plan
             state.selectedPlan = state.plans.find(plan => plan.id === planId);
+            console.log('Selected plan stored:', state.selectedPlan);
             
             // Enable select button
             const btn = document.getElementById('selectPlanBtn');
-            btn.disabled = false;
-            btn.innerHTML = 
-                '<span>💳</span>' +
-                '<span>Pagar R$ ' + Number(state.selectedPlan.preco).toFixed(2) + ' - ' + state.selectedPlan.nome + '</span>';
+            if (btn && state.selectedPlan) {
+                btn.disabled = false;
+                btn.innerHTML = 
+                    '<span>💳</span>' +
+                    '<span>Pagar R$ ' + Number(state.selectedPlan.preco).toFixed(2) + ' - ' + state.selectedPlan.nome + '</span>';
+                console.log('Select button enabled');
+                
+                // Show success message
+                showMessage('✅ Plano selecionado: ' + state.selectedPlan.nome, 'success', 3000);
+            }
         }
 
         // Trial Management
@@ -1466,77 +1526,121 @@
         }
 
         function loginAndRedirect(username, password) {
-            let loginUrl = state.linkLogin;
-            
-            if (loginUrl.includes('?')) {
-                loginUrl += '&username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password);
+            if (state.isMikroTikEnvironment) {
+                // Use MikroTik login URL
+                let loginUrl = '$(link-login-only)';
+                
+                if (loginUrl.includes('?')) {
+                    loginUrl += '&username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password);
+                } else {
+                    loginUrl += '?username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password);
+                }
+                
+                loginUrl += '&dst=' + encodeURIComponent('$(link-orig)');
+                
+                console.log('MikroTik redirect to:', loginUrl);
+                window.location.href = loginUrl;
             } else {
-                loginUrl += '?username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password);
+                // Use state values from URL parameters
+                let loginUrl = state.linkLogin;
+                
+                if (!loginUrl) {
+                    showMessage('❌ Link de login não disponível', 'error');
+                    return;
+                }
+                
+                if (loginUrl.includes('?')) {
+                    loginUrl += '&username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password);
+                } else {
+                    loginUrl += '?username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password);
+                }
+                
+                if (state.linkOrig) {
+                    loginUrl += '&dst=' + encodeURIComponent(state.linkOrig);
+                }
+                
+                console.log('External API redirect to:', loginUrl);
+                window.location.href = loginUrl;
             }
-            
-            if (state.linkOrig) {
-                loginUrl += '&dst=' + encodeURIComponent(state.linkOrig);
-            }
-            
-            console.log('Redirecting to:', loginUrl);
-            window.location.href = loginUrl;
         }
 
-        // Event Listeners
+        // Initialize everything when page loads
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded - initializing...');
+            
+            // Detect environment and initialize accordingly
+            detectEnvironment();
+            
+            // Focus on username input (MikroTik style)
+            setTimeout(() => {
+                const usernameInput = document.getElementById('username');
+                if (usernameInput) {
+                    usernameInput.focus();
+                }
+                // Also try the form reference
+                if (document.login && document.login.username) {
+                    document.login.username.focus();
+                }
+            }, 100);
+            
+            // Setup all event listeners
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            console.log('Setting up event listeners...');
+            
+            // Select Plan Button
             const selectPlanBtn = document.getElementById('selectPlanBtn');
             if (selectPlanBtn) {
-                selectPlanBtn.addEventListener('click', () => {
+                selectPlanBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log('Select plan clicked, selected plan:', state.selectedPlan);
+                    
                     if (state.selectedPlan) {
                         showScreen('instructionsScreen');
                     } else {
-                        alert('Por favor, selecione um plano primeiro.');
+                        showMessage('⚠️ Por favor, selecione um plano primeiro.', 'warning');
                     }
                 });
+                console.log('Select plan button listener added');
             }
-        });
-
-        document.addEventListener('DOMContentLoaded', function() {
-            const continueBtn = document.getElementById('continueBtn');
-            const copyBtn = document.getElementById('copyBtn');
-            const connectBtn = document.getElementById('connectBtn');
             
+            // Continue Button (Instructions -> PIX)
+            const continueBtn = document.getElementById('continueBtn');
             if (continueBtn) {
-                continueBtn.addEventListener('click', () => {
+                continueBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log('Continue button clicked');
                     generatePix();
                 });
+                console.log('Continue button listener added');
             }
             
+            // Copy PIX Button
+            const copyBtn = document.getElementById('copyBtn');
             if (copyBtn) {
-                copyBtn.addEventListener('click', copyPixCode);
+                copyBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log('Copy PIX button clicked');
+                    copyPixCode();
+                });
+                console.log('Copy button listener added');
             }
             
+            // Connect Button (Success screen)
+            const connectBtn = document.getElementById('connectBtn');
             if (connectBtn) {
-                connectBtn.addEventListener('click', () => {
+                connectBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log('Connect button clicked');
                     const username = document.getElementById('successUsername').textContent;
                     const password = document.getElementById('successPassword').textContent;
                     loginAndRedirect(username, password);
                 });
+                console.log('Connect button listener added');
             }
-        });
-
-        // Focus on username input (like MikroTik example)
-        document.addEventListener('DOMContentLoaded', function() {
-            const usernameInput = document.getElementById('username');
-            if (usernameInput) {
-                usernameInput.focus();
-            }
-        });
-
-        // Also focus when page loads (MikroTik style)
-        if (document.login && document.login.username) {
-            document.login.username.focus();
         }
-
-        // Initialize
-        window.addEventListener('DOMContentLoaded', () => {
-            getUrlParams();
-        });
     </script>
 </body>
 </html> 
