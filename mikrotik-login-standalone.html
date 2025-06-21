@@ -1319,7 +1319,7 @@
             }
         }
 
-        // Trial activation com múltiplos fallbacks
+        // Trial activation - Redirecionamento direto como no MikroTik original
         async function activateTrial() {
             if (state.trialActivated) {
                 console.log('Trial já foi ativado anteriormente');
@@ -1327,134 +1327,105 @@
             }
             
             try {
-                console.log('=== ATIVANDO TRIAL COM FALLBACKS ===');
-                console.log('MAC:', state.mac);
-                console.log('Link Login:', state.linkLogin);
-                console.log('Link Orig:', state.linkOrig);
+                console.log('=== ATIVANDO TRIAL - REDIRECIONAMENTO DIRETO ===');
                 
-                // Validate MAC com fallback
+                // Mark as activated first
+                state.trialActivated = true;
+                
+                // Get MAC address com fallback
                 let mac = state.mac;
                 if (!mac || mac.includes('$(')) {
-                    // Fallback: tentar gerar MAC fake baseado em timestamp
+                    // Fallback: gerar MAC baseado em timestamp
                     const timestamp = Date.now().toString();
                     mac = timestamp.slice(-12).match(/.{2}/g).join(':');
                     console.warn('MAC não disponível, usando fallback:', mac);
                 }
                 
-                // Múltiplos fallbacks para URL de login
+                // Get login URL com fallbacks
                 let loginUrl = null;
                 
-                // Fallback 1: Form action
+                // Tenta pegar do form action primeiro
                 const form = document.getElementById('loginForm');
                 if (form && form.action && !form.action.includes('$(')) {
                     loginUrl = form.action;
-                    console.log('Fallback 1 - Form action:', loginUrl);
                 }
                 
-                // Fallback 2: State linkLogin
+                // Fallback para state.linkLogin
                 if (!loginUrl && state.linkLogin && !state.linkLogin.includes('$(')) {
                     loginUrl = state.linkLogin;
-                    console.log('Fallback 2 - State linkLogin:', loginUrl);
                 }
                 
-                // Fallback 3: Tentar detectar pela URL atual
+                // Fallback para URL construída
                 if (!loginUrl) {
                     const currentUrl = window.location.href;
                     const urlObj = new URL(currentUrl);
-                    // Tenta construir URL baseada na atual
                     loginUrl = urlObj.protocol + '//' + urlObj.host + '/login';
-                    console.log('Fallback 3 - URL construída:', loginUrl);
                 }
                 
-                // Fallback 4: URLs comuns do MikroTik
-                const fallbackUrls = [
-                    'http://10.5.50.1/login',
-                    'http://192.168.1.1/login',
-                    'http://192.168.0.1/login',
-                    'http://10.0.0.1/login'
-                ];
-                
+                // Último fallback: URL padrão
                 if (!loginUrl) {
-                    loginUrl = fallbackUrls[0];
-                    console.log('Fallback 4 - URL padrão:', loginUrl);
+                    loginUrl = 'http://10.5.50.1/login';
                 }
                 
-                // Gera username do trial
+                // Gera username do trial (como no original: T-$(mac-esc))
                 const trialUsername = 'T-' + mac.replace(/:/g, '');
                 
-                // Múltiplas tentativas de ativação
-                const trialAttempts = [];
+                // Constrói URL do trial exatamente como no MikroTik original
+                // Formato: $(link-login-only)?dst=$(link-orig-esc)&username=T-$(mac-esc)
+                let trialUrl = loginUrl;
+                const params = [];
                 
-                // Tentativa 1: URL completa com dst
+                // Adiciona dst se disponível
                 if (state.linkOrig && !state.linkOrig.includes('$(')) {
-                    trialAttempts.push(loginUrl + '?dst=' + encodeURIComponent(state.linkOrig) + '&username=' + encodeURIComponent(trialUsername));
+                    params.push('dst=' + encodeURIComponent(state.linkOrig));
                 }
                 
-                // Tentativa 2: URL só com username
-                trialAttempts.push(loginUrl + '?username=' + encodeURIComponent(trialUsername));
+                // Adiciona username do trial
+                params.push('username=' + encodeURIComponent(trialUsername));
                 
-                // Tentativa 3: Form submission
-                trialAttempts.push('FORM_SUBMIT');
-                
-                // Tentativa 4: URLs fallback com username
-                fallbackUrls.forEach(url => {
-                    trialAttempts.push(url + '?username=' + encodeURIComponent(trialUsername));
-                });
+                // Monta URL final
+                if (params.length > 0) {
+                    trialUrl += (trialUrl.includes('?') ? '&' : '?') + params.join('&');
+                }
                 
                 console.log('Trial Username:', trialUsername);
-                console.log('Tentativas de trial:', trialAttempts);
+                console.log('Trial URL:', trialUrl);
+                console.log('MAC usado:', mac);
+                console.log('Login URL base:', loginUrl);
+                console.log('Link Orig:', state.linkOrig);
                 
                 // Mostra notice discreta
                 const trialNotice = document.getElementById('trialNotice');
                 trialNotice.style.display = 'block';
-                trialNotice.innerHTML = '✅ Acesso temporário liberado';
+                trialNotice.innerHTML = '✅ Ativando acesso temporário...';
                 
-                // Mark as activated
-                state.trialActivated = true;
-                
-                // Executa tentativas em sequência
-                for (let i = 0; i < trialAttempts.length; i++) {
-                    const attempt = trialAttempts[i];
-                    console.log(`Tentativa ${i + 1}:`, attempt);
-                    
-                    try {
-                        if (attempt === 'FORM_SUBMIT') {
-                            // Tentativa via form submission
-                            if (form) {
-                                const hiddenUsername = document.getElementById('hiddenUsername');
-                                const hiddenPassword = document.getElementById('hiddenPassword');
-                                
-                                if (hiddenUsername && hiddenPassword) {
-                                    hiddenUsername.value = trialUsername;
-                                    hiddenPassword.value = 'trial';
-                                    
-                                    console.log('Submetendo form com trial credentials');
-                                    form.submit();
-                                    return; // Sai da função se conseguiu submeter
-                                }
-                            }
-                        } else {
-                            // Tentativa via redirect
-                            console.log('Redirecionando para:', attempt);
-                            window.location.href = attempt;
-                            return; // Sai da função após primeiro redirect
-                        }
-                    } catch (attemptError) {
-                        console.warn(`Tentativa ${i + 1} falhou:`, attemptError);
-                        continue; // Tenta próxima
-                    }
-                    
-                    // Delay entre tentativas se não foi redirect
-                    if (i < trialAttempts.length - 1) {
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-                    }
-                }
-                
-                console.log('Todas as tentativas de trial executadas');
+                // Pequeno delay para mostrar a mensagem
+                setTimeout(() => {
+                    console.log('🚀 REDIRECIONANDO PARA TRIAL:', trialUrl);
+                    // Redirecionamento direto (como no link original do MikroTik)
+                    window.location.href = trialUrl;
+                }, 500);
                 
             } catch (error) {
                 console.error('Erro ao ativar trial:', error);
-                // Não mostra erro para o usuário, trial é silencioso
+                
+                // Fallback final: tenta URLs padrão
+                const fallbackUrls = [
+                    'http://10.5.50.1/login?username=T-trial',
+                    'http://192.168.1.1/login?username=T-trial',
+                    'http://192.168.0.1/login?username=T-trial'
+                ];
+                
+                console.log('Tentando fallback URLs...');
+                for (const url of fallbackUrls) {
+                    try {
+                        console.log('Tentando:', url);
+                        window.location.href = url;
+                        break;
+                    } catch (fallbackError) {
+                        console.warn('Fallback falhou:', fallbackError);
+                    }
+                }
             }
         }
 
