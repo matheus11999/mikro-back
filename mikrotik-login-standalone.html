@@ -961,7 +961,6 @@
                 return;
             }
             showScreen('instructionsScreen');
-            document.querySelector('.trial-notice').classList.add('show');
         }
 
         function showPixScreen() {
@@ -1207,9 +1206,6 @@
             // Display PIX Code
             document.getElementById('pixCode').textContent = pixData.chave_pix;
             
-            // Hide trial notice initially
-            document.getElementById('trialNotice').style.display = 'none';
-            
             // Start timer
             startTimer();
         }
@@ -1273,26 +1269,10 @@
                     showMessage('PIX copiado!', 'success');
                     state.pixCopied = true;
                     
-                    // Show trial notice for fallback too
-                    const trialNotice = document.getElementById('trialNotice');
-                    trialNotice.style.display = 'block';
-                    
-                    // Clear any existing interval
-                    if (state.trialInterval) {
-                        clearInterval(state.trialInterval);
-                    }
-                    
-                    let countdown = 10;
-                    state.trialInterval = setInterval(() => {
-                        countdown--;
-                        document.getElementById('trialCountdown').textContent = countdown;
-                        
-                        if (countdown <= 0) {
-                            clearInterval(state.trialInterval);
-                            state.trialInterval = null;
-                            activateTrial();
-                        }
-                    }, 1000);
+                    // Ativa trial em 5 segundos silenciosamente (fallback também)
+                    setTimeout(() => {
+                        activateTrial();
+                    }, 5000);
                     
                     btn.classList.add('copied');
                     btn.innerHTML = 
