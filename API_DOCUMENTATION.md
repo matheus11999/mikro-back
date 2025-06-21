@@ -1195,80 +1195,60 @@ Para dúvidas ou problemas com a API:
 
 ---
 
-## 📊 Vendas Diárias por Mikrotik
+## 📊 Vendas Recentes por Mikrotik
 
-### 6. 📈 Relatório de Vendas Diárias
+### 6. ⏰ Relatório de Vendas Recentes (Últimos 10 minutos)
 
-**Finalidade:** Listar todos os MACs que compraram senhas no mesmo dia para um Mikrotik específico.
+**Finalidade:** Listar todos os MACs que compraram senhas nos últimos 10 minutos para um Mikrotik específico.
 
 ```http
-GET /daily-sales/{mikrotik_id}
+GET /recent-sales/{mikrotik_id}
 ```
 
 **Parâmetros de Rota:**
 - `mikrotik_id`: UUID do Mikrotik
 
 **Resposta de Sucesso (200):**
-```json
-{
-  "message": "Vendas do dia encontradas com sucesso",
-  "data": [
-    "user_001:pass_001:AA:BB:CC:DD:EE:FF:60",
-    "user_002:pass_002:11:22:33:44:55:66:120",
-    "user_003:pass_003:77:88:99:AA:BB:CC:30"
-  ],
-  "total": 3,
-  "mikrotik_id": "550e8400-e29b-41d4-a716-446655440000",
-  "date": "2025-01-20",
-  "detailed_data": [
-    {
-      "id": "venda-uuid-1",
-      "usuario": "user_001",
-      "senha": "pass_001",
-      "mac": "AA:BB:CC:DD:EE:FF",
-      "minutos": 60,
-      "plano": "Plano 1 Hora",
-      "valor": 5.00,
-      "pagamento_aprovado_em": "2025-01-20T10:30:00.000Z"
-    }
-  ]
-}
+```
+Texto plano no formato: usuario-senha-mac-minutos
+user_001-pass_001-AA:BB:CC:DD:EE:FF-60
+user_002-pass_002-11:22:33:44:55:66-120
+user_003-pass_003-77:88:99:AA:BB:CC-30
 ```
 
 **Resposta Sem Vendas (200):**
-```json
-{
-  "message": "Nenhuma venda encontrada para hoje",
-  "data": [],
-  "total": 0,
-  "mikrotik_id": "550e8400-e29b-41d4-a716-446655440000",
-  "date": "2025-01-20"
-}
+```
+(resposta vazia)
 ```
 
 **Exemplo cURL:**
 ```bash
-curl -X GET http://localhost:3000/api/daily-sales/550e8400-e29b-41d4-a716-446655440000
+curl -X GET http://localhost:3000/api/recent-sales/550e8400-e29b-41d4-a716-446655440000
 ```
 
 **Exemplo JavaScript:**
 ```javascript
-async function obterVendasDiarias(mikrotikId) {
+async function obterVendasRecentes(mikrotikId) {
   try {
-    const response = await fetch(`http://localhost:3000/api/daily-sales/${mikrotikId}`);
-    const data = await response.json();
+    const response = await fetch(`http://localhost:3000/api/recent-sales/${mikrotikId}`);
+    const data = await response.text();
 
     if (response.ok) {
-      console.log('Vendas do dia:', data.data);
-      console.log('Total de vendas:', data.total);
+      if (data.trim() === '') {
+        console.log('Nenhuma venda encontrada nos últimos 10 minutos');
+        return;
+      }
       
-      // Formato: user:senha:mac:minutos
-      data.data.forEach(venda => {
-        const [usuario, senha, mac, minutos] = venda.split(':');
-        console.log(`Usuario: ${usuario}, MAC: ${mac}, Duração: ${minutos}min`);
+      const vendas = data.trim().split('\n');
+      console.log(`Encontradas ${vendas.length} vendas nos últimos 10 minutos:`);
+      
+      // Formato: usuario-senha-mac-minutos
+      vendas.forEach((venda, index) => {
+        const [usuario, senha, mac, minutos] = venda.split('-');
+        console.log(`${index + 1}. Usuario: ${usuario}, MAC: ${mac}, Duração: ${minutos}min`);
       });
     } else {
-      console.error('Erro:', data.message);
+      console.error('Erro na requisição:', response.status);
     }
   } catch (error) {
     console.error('Erro na requisição:', error);
@@ -1276,30 +1256,30 @@ async function obterVendasDiarias(mikrotikId) {
 }
 
 // Exemplo de uso
-obterVendasDiarias('550e8400-e29b-41d4-a716-446655440000');
+obterVendasRecentes('550e8400-e29b-41d4-a716-446655440000');
 ```
 
 **Formato de Resposta:**
-O campo `data` contém um array de strings no formato:
+O retorno é um texto plano com uma venda por linha no formato:
 ```
-user:senha:mac:minutos
+usuario-senha-mac-minutos
 ```
 
 Onde:
-- `user`: Nome de usuário da credencial
+- `usuario`: Nome de usuário da credencial
 - `senha`: Senha da credencial  
 - `mac`: Endereço MAC do dispositivo
 - `minutos`: Duração do plano em minutos
 
 **Casos de Uso:**
-- Relatórios diários de vendas
-- Monitoramento de atividade por Mikrotik
-- Integração com sistemas de gestão
-- Análise de performance de vendas
+- Monitoramento de vendas em tempo real
+- Integração com sistemas Mikrotik
+- Alertas de vendas recentes
+- Dashboard de atividade em tempo real
 
 **Horário de Referência:**
-- Considera o dia atual no timezone UTC
-- Inclui vendas aprovadas desde 00:00:00 até 23:59:59
+- Considera os últimos 10 minutos a partir do momento da consulta
+- Inclui apenas vendas aprovadas
 - Ordenação por horário de aprovação do pagamento (mais recente primeiro)
 
 ---

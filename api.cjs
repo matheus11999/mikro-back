@@ -1214,8 +1214,8 @@ app.post('/api/captive-check/poll-payment', async (req, res, next) => {
   }
 });
 
-// Endpoint para listar MACs que compraram senhas no mesmo dia por Mikrotik
-app.get('/api/daily-sales/:mikrotik_id', async (req, res, next) => {
+// Endpoint para listar MACs que compraram senhas nos últimos 10 minutos por Mikrotik
+app.get('/api/recent-sales/:mikrotik_id', async (req, res, next) => {
   try {
     const { mikrotik_id } = req.params;
     
@@ -1228,14 +1228,13 @@ app.get('/api/daily-sales/:mikrotik_id', async (req, res, next) => {
       };
     }
 
-    console.log('[DAILY-SALES] Buscando vendas diárias para mikrotik:', mikrotik_id);
+    console.log('[RECENT-SALES] Buscando vendas dos últimos 10 minutos para mikrotik:', mikrotik_id);
 
-    // Data de hoje (início e fim do dia em UTC)
-    const hoje = new Date();
-    const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
-    const fimHoje = new Date(inicioHoje.getTime() + 24 * 60 * 60 * 1000);
+    // Data dos últimos 10 minutos
+    const agora = new Date();
+    const dezMinutosAtras = new Date(agora.getTime() - 10 * 60 * 1000); // 10 minutos atrás
 
-    // Buscar vendas aprovadas do dia atual para o mikrotik específico
+    // Buscar vendas aprovadas dos últimos 10 minutos para o mikrotik específico
     const vendas = await handleSupabaseOperation(() =>
       supabaseAdmin
         .from('vendas')
@@ -1247,8 +1246,7 @@ app.get('/api/daily-sales/:mikrotik_id', async (req, res, next) => {
         `)
         .eq('mikrotik_id', mikrotik_id)
         .eq('status', 'aprovado')
-        .gte('pagamento_aprovado_em', inicioHoje.toISOString())
-        .lt('pagamento_aprovado_em', fimHoje.toISOString())
+        .gte('pagamento_aprovado_em', dezMinutosAtras.toISOString())
         .order('pagamento_aprovado_em', { ascending: false })
     );
 
@@ -1266,7 +1264,7 @@ app.get('/api/daily-sales/:mikrotik_id', async (req, res, next) => {
       return `${usuario}-${senha}-${mac}-${minutos}`;
     });
 
-    console.log(`[DAILY-SALES] Encontradas ${vendas.length} vendas para hoje`);
+    console.log(`[RECENT-SALES] Encontradas ${vendas.length} vendas nos últimos 10 minutos`);
 
     // Retornar apenas texto puro, uma venda por linha
     res.set('Content-Type', 'text/plain');
