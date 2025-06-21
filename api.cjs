@@ -1469,6 +1469,220 @@ function getAvailableTemplates() {
   return templates;
 }
 
+// Endpoint para receber notificações de autenticação do Mikrotik
+app.post('/api/mikrotik/auth-notification', async (req, res, next) => {
+  try {
+    const { token, mac_address, mikrotik_id, action, usuario, ip_address } = req.body;
+    
+    console.log('[MIKROTIK AUTH] Notificação recebida:', { 
+      mac_address, 
+      mikrotik_id, 
+      action, 
+      usuario, 
+      ip_address,
+      timestamp: new Date().toISOString()
+    });
+
+    // Token de segurança - deve ser configurado no .env
+    const expectedToken = process.env.MIKROTIK_AUTH_TOKEN || 'mikrotik-secure-token-2024';
+    
+    if (!token || token !== expectedToken) {
+      console.error('[MIKROTIK AUTH] Token inválido:', token);
+      return res.status(401).json({
+        error: 'Token de autorização inválido',
+        code: 'UNAUTHORIZED',
+        message: 'Token obrigatório e deve ser válido'
+      });
+    }
+
+    // Validação de campos obrigatórios
+    if (!mac_address || !mikrotik_id || !action) {
+      throw {
+        message: 'Campos obrigatórios ausentes',
+        code: 'VALIDATION_ERROR',
+        details: 'mac_address, mikrotik_id e action são obrigatórios',
+        source: 'API'
+      };
+    }
+
+    // Validar formato do MAC
+    if (!isValidMac(mac_address)) {
+      throw {
+        message: 'MAC address inválido',
+        code: 'VALIDATION_ERROR',
+        details: 'Formato esperado: XX:XX:XX:XX:XX:XX',
+        source: 'API'
+      };
+    }
+
+    // Buscar MAC no banco de dados
+    const macs = await handleSupabaseOperation(() =>
+      supabaseAdmin
+        .from('macs')
+        .select('*')
+        .eq('mac_address', mac_address)
+        .eq('mikrotik_id', mikrotik_id)
+    );
+
+    let macObj = macs && macs[0];
+
+    // Se MAC não existe, cria um novo registro
+    if (!macObj) {
+      console.log('[MIKROTIK AUTH] MAC não encontrado, criando novo registro:', mac_address);
+      
+      macObj = await handleSupabaseOperation(() =>
+        supabaseAdmin
+          .from('macs')
+          .insert([{
+            mac_address,
+            mikrotik_id,
+            status: 'coletado',
+            primeiro_acesso: new Date().toISOString(),
+            ultimo_acesso: null,
+            total_compras: 0,
+            ultimo_plano: '',
+            ultimo_valor: 0,
+            total_gasto: 0,
+            status_pagamento: 'aguardando',
+            chave_pix: '',
+            qrcode: '',
+            pagamento_aprovado_em: null
+          }])
+          .select()
+          .single()
+      );
+    }
+
+    // Determinar novo status baseado na ação
+    let novoStatus = macObj.status;
+    const agora = new Date().toISOString();
+
+    switch (action.toLowerCase()) {
+      case 'login':
+      case 'connect':
+      case 'authenticated':
+        novoStatus = 'conectado';
+        break;
+      case 'logout':
+      case 'disconnect':
+      case 'disconnected':
+        novoStatus = 'desconectado';
+        break;
+      default:
+        console.warn('[MIKROTIK AUTH] Ação desconhecida:', action);
+        novoStatus = 'ativo'; // Status genérico para ações não reconhecidas
+    }
+
+    console.log('[MIKROTIK AUTH] Atualizando status:', {
+      mac: mac_address,
+      statusAnterior: macObj.status,
+      novoStatus,
+      action
+    });
+
+    // Preparar dados para atualização
+    const dadosAtualizacao = {
+      status: novoStatus,
+      ultimo_acesso: agora
+    };
+
+    // Se forneceu usuário, atualizar também
+    if (usuario) {
+      dadosAtualizacao.ultimo_usuario_mikrotik = usuario;
+    }
+
+    // Se forneceu IP, atualizar também
+    if (ip_address) {
+      dadosAtualizacao.ultimo_ip = ip_address;
+    }
+
+    // Atualizar MAC no banco
+    const macAtualizado = await handleSupabaseOperation(() =>
+      supabaseAdmin
+        .from('macs')
+        .update(dadosAtualizacao)
+        .eq('id', macObj.id)
+        .select()
+        .single()
+    );
+
+    // Registrar log da autenticação (opcional - para auditoria)
+    try {
+      await handleSupabaseOperation(() =>
+        supabaseAdmin
+          .from('logs_autenticacao')
+          .insert([{
+            mac_id: macObj.id,
+            mac_address,
+            mikrotik_id,
+            action,
+            usuario_mikrotik: usuario,
+            ip_address,
+            timestamp: agora,
+            status_anterior: macObj.status,
+            status_novo: novoStatus
+          }])
+      );
+    } catch (logError) {
+      // Se a tabela de logs não existe, apenas loga o erro mas não falha a operação
+      console.warn('[MIKROTIK AUTH] Não foi possível salvar log (tabela logs_autenticacao pode não existir):', logError.message);
+    }
+
+    console.log('[MIKROTIK AUTH] MAC atualizado com sucesso:', {
+      id: macAtualizado.id,
+      mac_address: macAtualizado.mac_address,
+      status: macAtualizado.status,
+      ultimo_acesso: macAtualizado.ultimo_acesso
+    });
+
+    // Resposta de sucesso
+    return res.json({
+      success: true,
+      message: 'Autenticação registrada com sucesso',
+      data: {
+        mac_id: macAtualizado.id,
+        mac_address: macAtualizado.mac_address,
+        status_anterior: macObj.status,
+        status_atual: macAtualizado.status,
+        ultimo_acesso: macAtualizado.ultimo_acesso,
+        action_processada: action
+      }
+    });
+
+  } catch (err) {
+    console.error('[MIKROTIK AUTH] Erro ao processar notificação:', err);
+    next(err);
+  }
+});
+
+// Endpoint GET para testar se a rota de autenticação está funcionando
+app.get('/api/mikrotik/auth-notification/test', (req, res) => {
+  res.json({
+    message: 'Endpoint de autenticação Mikrotik está ativo',
+    timestamp: new Date().toISOString(),
+    expectedFields: {
+      token: 'Token de segurança (obrigatório)',
+      mac_address: 'MAC address no formato XX:XX:XX:XX:XX:XX',
+      mikrotik_id: 'ID do Mikrotik',
+      action: 'Ação: login, logout, connect, disconnect, etc.',
+      usuario: 'Usuário autenticado (opcional)',
+      ip_address: 'IP do cliente (opcional)'
+    },
+    example: {
+      method: 'POST',
+      url: '/api/mikrotik/auth-notification',
+      body: {
+        token: 'seu-token-aqui',
+        mac_address: '00:11:22:33:44:55',
+        mikrotik_id: '1',
+        action: 'login',
+        usuario: 'user123',
+        ip_address: '192.168.1.100'
+      }
+    }
+  });
+});
+
 // Registra o middleware de erro no final
 app.use(errorHandler);
 
