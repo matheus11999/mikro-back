@@ -459,6 +459,7 @@
             opacity: 0.6;
             cursor: not-allowed;
             transform: none !important;
+            background: #6c757d !important;
         }
 
         .btn.loading {
@@ -1260,7 +1261,9 @@
         function displayPlans(plans) {
             const container = document.getElementById('plansContainer');
             
-            let htmlContent = '';
+            // Clear previous content
+            container.innerHTML = '';
+            
             plans.forEach(function(plan) {
                 // Use only real data from API - no fallbacks
                 const features = plan.features || [];
@@ -1274,21 +1277,37 @@
                     featuresHtml = '<li>' + formatDuration(plan.duracao) + ' de acesso</li>';
                 }
                 
-                htmlContent += 
-                    '<div class="plan-card" onclick="selectPlan(' + plan.id + ')" data-plan-id="' + plan.id + '">' +
-                        '<div class="plan-name">' + plan.nome + '</div>' +
-                        '<div class="plan-price">R$ ' + Number(plan.preco).toFixed(2) + '</div>' +
-                        '<ul class="plan-features">' +
-                            featuresHtml +
-                        '</ul>' +
-                    '</div>';
+                // Create plan card element
+                const planCard = document.createElement('div');
+                planCard.className = 'plan-card';
+                planCard.setAttribute('data-plan-id', plan.id);
+                planCard.innerHTML = 
+                    '<div class="plan-name">' + plan.nome + '</div>' +
+                    '<div class="plan-price">R$ ' + Number(plan.preco).toFixed(2) + '</div>' +
+                    '<ul class="plan-features">' +
+                        featuresHtml +
+                    '</ul>';
+                
+                // Add click event listener directly
+                planCard.addEventListener('click', function() {
+                    selectPlan(plan.id);
+                });
+                
+                // Add to container
+                container.appendChild(planCard);
             });
             
-            container.innerHTML = htmlContent;
+            console.log('Plans displayed:', plans.length, 'cards created');
         }
 
         function selectPlan(planId) {
-            console.log('Selecting plan:', planId);
+            console.log('Selecting plan:', planId, 'Available plans:', state.plans);
+            
+            if (!state.plans || !Array.isArray(state.plans)) {
+                console.error('No plans available in state');
+                showMessage('❌ Erro: Planos não carregados', 'error');
+                return;
+            }
             
             // Remove previous selection
             document.querySelectorAll('.plan-card').forEach(card => {
@@ -1300,23 +1319,35 @@
             if (planCard) {
                 planCard.classList.add('selected');
                 console.log('Plan card selected:', planCard);
+            } else {
+                console.error('Plan card not found for ID:', planId);
             }
             
-            // Store selected plan
-            state.selectedPlan = state.plans.find(plan => plan.id === planId);
-            console.log('Selected plan stored:', state.selectedPlan);
-            
-            // Enable select button
-            const btn = document.getElementById('selectPlanBtn');
-            if (btn && state.selectedPlan) {
-                btn.disabled = false;
-                btn.innerHTML = 
-                    '<span>💳</span>' +
-                    '<span>Pagar R$ ' + Number(state.selectedPlan.preco).toFixed(2) + ' - ' + state.selectedPlan.nome + '</span>';
-                console.log('Select button enabled');
+            // Store selected plan - ensure planId is correct type
+            const selectedPlan = state.plans.find(plan => plan.id == planId || plan.id === planId);
+            if (selectedPlan) {
+                state.selectedPlan = selectedPlan;
+                console.log('Selected plan stored:', state.selectedPlan);
                 
-                // Show success message
-                showMessage('✅ Plano selecionado: ' + state.selectedPlan.nome, 'success', 3000);
+                // Enable select button
+                const btn = document.getElementById('selectPlanBtn');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.style.opacity = '1';
+                    btn.style.cursor = 'pointer';
+                    btn.innerHTML = 
+                        '<span>💳</span>' +
+                        '<span>Pagar R$ ' + Number(state.selectedPlan.preco).toFixed(2) + ' - ' + state.selectedPlan.nome + '</span>';
+                    console.log('Select button enabled with text:', btn.innerHTML);
+                    
+                    // Show success message
+                    showMessage('✅ Plano selecionado: ' + state.selectedPlan.nome, 'success', 3000);
+                } else {
+                    console.error('Select button not found');
+                }
+            } else {
+                console.error('Plan not found in state.plans for ID:', planId);
+                showMessage('❌ Erro: Plano não encontrado', 'error');
             }
         }
 
