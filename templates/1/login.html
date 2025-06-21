@@ -718,25 +718,28 @@
                 <div class="password-login">
                     <h2>Já tem uma senha de acesso?</h2>
                     
-                    $(if error)
-                    <div class="error-message">
-                        <strong>Erro!</strong> $(error)
+                    <!-- Error message will be shown via JavaScript -->
+                    <div id="errorMessage" class="error-message" style="display: none;">
+                        <strong>Erro!</strong> <span id="errorText"></span>
                     </div>
-                    $(endif)
 
-                    <form name="login" action="$(link-login-only)" method="post" $(if chap-id) onSubmit="return doLogin()" $(endif)>
-                        <input type="hidden" name="dst" value="$(link-orig)" />
+                    <!-- MikroTik CHAP Form - Hidden -->
+                    <form name="sendin" action="" method="post" style="display:none">
+                        <input type="hidden" name="username" />
+                        <input type="hidden" name="password" />
+                        <input type="hidden" name="dst" value="" />
                         <input type="hidden" name="popup" value="true" />
-                        
+                    </form>
+
+                    <!-- Main Login Form -->
+                    <form name="login" id="loginForm" onSubmit="return handleLoginSubmit(event)">
                         <div class="form-group">
                             <label for="username">Digite sua senha:</label>
                             <input type="text" 
                                    name="username" 
                                    id="username"
-                                   value="$(username)" 
                                    placeholder="Digite a senha aqui..." 
                                    required />
-                            <input type="hidden" name="password" value=""/>
                         </div>
 
                         <button type="submit" class="btn btn-primary">
@@ -744,13 +747,6 @@
                             <span>CONECTAR</span>
                         </button>
                     </form>
-
-                    $(if trial == 'yes')
-                    <button onclick="activateFreeTrial()" class="btn btn-secondary">
-                        <span>🎁</span>
-                        <span>TESTE GRÁTIS</span>
-                    </button>
-                    $(endif)
 
                     <button id="buyPixBtn" onclick="showPlansScreen()" class="btn btn-success">
                         <span>💳</span>
@@ -1029,13 +1025,39 @@
 
         // MikroTik CHAP Authentication
         function doLogin() {
-            if (document.sendin && document.login) {
-                document.sendin.username.value = document.login.username.value;
-                document.sendin.password.value = document.login.username.value;
-                document.sendin.submit();
+            const usernameInput = document.getElementById('username');
+            const username = usernameInput ? usernameInput.value.trim() : '';
+            
+            if (!username) {
+                showMessage('⚠️ Por favor, digite uma senha', 'warning');
                 return false;
             }
-            return true;
+            
+            if (state.isMikroTikEnvironment && document.sendin) {
+                // Set both username and password to the same value
+                document.sendin.username.value = username;
+                document.sendin.password.value = username;
+                document.sendin.dst.value = state.linkOrig || '';
+                
+                // Set the action URL
+                if (state.linkLogin) {
+                    document.sendin.action = state.linkLogin;
+                }
+                
+                console.log('MikroTik CHAP login:', {
+                    username: username,
+                    password: username,
+                    dst: state.linkOrig,
+                    action: state.linkLogin
+                });
+                
+                document.sendin.submit();
+                return false;
+            } else {
+                // Direct redirect for non-MikroTik environment
+                loginAndRedirect(username, username);
+                return false;
+            }
         }
 
         // Utility Functions
@@ -1571,55 +1593,41 @@
         }
 
         function loginAndRedirect(username, password) {
-            if (state.isMikroTikEnvironment) {
-                // Use MikroTik login URL
-                let loginUrl = '$(link-login-only)';
-                
-                if (loginUrl.includes('?')) {
-                    loginUrl += '&username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password);
-                } else {
-                    loginUrl += '?username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password);
-                }
-                
-                loginUrl += '&dst=' + encodeURIComponent('$(link-orig)');
-                
-                console.log('MikroTik redirect to:', loginUrl);
-                window.location.href = loginUrl;
-            } else {
-                // Use state values from URL parameters
-                let loginUrl = state.linkLogin;
-                
-                if (!loginUrl) {
-                    showMessage('❌ Link de login não disponível', 'error');
-                    return;
-                }
-                
-                if (loginUrl.includes('?')) {
-                    loginUrl += '&username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password);
-                } else {
-                    loginUrl += '?username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password);
-                }
-                
-                if (state.linkOrig) {
-                    loginUrl += '&dst=' + encodeURIComponent(state.linkOrig);
-                }
-                
-                console.log('External API redirect to:', loginUrl);
-                window.location.href = loginUrl;
+            let loginUrl = state.linkLogin;
+            
+            if (!loginUrl) {
+                showMessage('❌ Link de login não disponível', 'error');
+                console.error('Link de login não encontrado no state:', state);
+                return;
             }
+            
+            // Build login URL with parameters
+            if (loginUrl.includes('?')) {
+                loginUrl += '&username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password);
+            } else {
+                loginUrl += '?username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password);
+            }
+            
+            // Add destination URL if available
+            if (state.linkOrig) {
+                loginUrl += '&dst=' + encodeURIComponent(state.linkOrig);
+            }
+            
+            console.log('Redirecting to:', loginUrl);
+            console.log('Login data:', { username, password, dst: state.linkOrig });
+            
+            // Show loading before redirect
+            showLoading('Conectando...', 'Redirecionando para a internet');
+            
+            // Small delay for better UX
+            setTimeout(() => {
+                window.location.href = loginUrl;
+            }, 1000);
         }
 
         // Handle login form submission
         function handleLoginSubmit(event) {
             if (event) event.preventDefault();
-            
-            const usernameInput = document.getElementById('username');
-            const username = usernameInput ? usernameInput.value.trim() : '';
-            
-            if (!username) {
-                showMessage('⚠️ Por favor, digite uma senha', 'warning');
-                return false;
-            }
             
             // Show loading while processing
             showLoading('Verificando senha...', 'Aguarde um momento');
@@ -1627,16 +1635,8 @@
             // Small delay for better UX
             setTimeout(() => {
                 hideLoading();
-                
-                if (state.isMikroTikEnvironment) {
-                    // Let MikroTik handle the login
-                    return doLogin();
-                } else {
-                    // For external API, just show message
-                    showMessage('✅ Senha inserida: ' + username, 'success');
-                    console.log('Login attempt with username:', username);
-                }
-            }, 1000);
+                doLogin();
+            }, 500);
             
             return false;
         }
