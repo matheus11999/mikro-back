@@ -1,162 +1,1021 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PIX Mikro - Template 1 - Login</title>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta http-equiv="pragma" content="no-cache" />
+    <meta http-equiv="expires" content="-1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+    <title>Avistão WIFI - Portal de Acesso</title>
+    <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
+    
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-        }
-
+    </script>
+</body>
+</html>
+        
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
+            color: #333;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100vh;
             display: flex;
-            align-items: center;
+            flex-direction: column;
             justify-content: center;
         }
-
-        .login-container {
-            background: white;
-            padding: 40px;
-            border-radius: 20px;
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
-            width: 100%;
-            max-width: 400px;
-        }
-
+        
         .logo {
             text-align: center;
             margin-bottom: 30px;
+            animation: fadeInDown 0.8s ease-out;
         }
-
-        .logo h1 {
-            color: #667eea;
-            font-size: 2rem;
-            font-weight: bold;
+        
+        .logo img {
+            max-width: 200px;
+            height: auto;
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
         }
-
-        .logo p {
-            color: #666;
-            margin-top: 5px;
+        
+        .panel {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            animation: fadeInUp 0.8s ease-out 0.2s both;
         }
-
+        
+        .panel h2 {
+            text-align: center;
+            margin-bottom: 25px;
+            color: #333;
+            font-weight: 600;
+            font-size: 24px;
+        }
+        
         .form-group {
             margin-bottom: 20px;
         }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            color: #333;
-            font-weight: 500;
-        }
-
-        .form-group input {
+        
+        .form-input {
             width: 100%;
-            padding: 12px 16px;
+            padding: 15px;
             border: 2px solid #e1e5e9;
-            border-radius: 10px;
+            border-radius: 12px;
             font-size: 16px;
-            transition: border-color 0.3s ease;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
         }
-
-        .form-group input:focus {
+        
+        .form-input:focus {
             outline: none;
             border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            background: white;
+            transform: translateY(-2px);
         }
-
-        .login-btn {
+        
+        .btn {
             width: 100%;
-            padding: 14px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            padding: 15px;
             border: none;
-            border-radius: 10px;
+            border-radius: 12px;
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            transition: transform 0.2s ease;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            position: relative;
+            overflow: hidden;
         }
-
-        .login-btn:hover {
-            transform: translateY(-2px);
+        
+        .btn:before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
         }
-
-        .footer {
+        
+        .btn:hover:before {
+            left: 100%;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin-bottom: 15px;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #56ab2f 0%, #a8e6cf 100%);
+            color: white;
+            font-size: 18px;
+            padding: 18px;
+            animation: pulse 2s infinite;
+        }
+        
+        .btn-success:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(86, 171, 47, 0.4);
+        }
+        
+        .btn-warning {
+            background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+            color: white;
+        }
+        
+        .btn-warning:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(255, 152, 0, 0.4);
+        }
+        
+        .divider {
             text-align: center;
-            margin-top: 30px;
+            margin: 25px 0;
+            position: relative;
+        }
+        
+        .divider:before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: #e1e5e9;
+        }
+        
+        .divider span {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 0 20px;
             color: #666;
+            font-weight: 500;
+        }
+        
+        .alert {
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: none;
+            animation: slideInLeft 0.5s ease-out;
+        }
+        
+        .alert-error {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+            color: white;
+        }
+        
+        .alert-success {
+            background: linear-gradient(135deg, #51cf66 0%, #40c057 100%);
+            color: white;
+        }
+        
+        .alert-info {
+            background: linear-gradient(135deg, #74c0fc 0%, #339af0 100%);
+            color: white;
+        }
+        
+        .alert-warning {
+            background: linear-gradient(135deg, #ffa726 0%, #fb8c00 100%);
+            color: white;
+        }
+        
+        /* Modal Styles */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            animation: fadeIn 0.3s ease-out;
+        }
+        
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            max-width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+            animation: scaleIn 0.3s ease-out;
+        }
+        
+        .modal-close {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+            transition: color 0.3s ease;
+        }
+        
+        .modal-close:hover {
+            color: #333;
+        }
+        
+        .plan-card {
+            border: 2px solid #e1e5e9;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+        
+        .plan-card:hover {
+            border-color: #667eea;
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            background: white;
+        }
+        
+        .plan-card.selected {
+            border-color: #667eea;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .plan-name {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .plan-price {
+            font-size: 24px;
+            font-weight: bold;
+            color: #51cf66;
+        }
+        
+        .plan-card.selected .plan-price {
+            color: #fff;
+        }
+        
+        .plan-duration {
+            font-size: 14px;
+            opacity: 0.8;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        .qr-container {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .qr-code {
+            max-width: 250px;
+            height: auto;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        
+        .pix-key {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 12px;
+            border: 2px dashed #667eea;
+            margin: 15px 0;
+            word-break: break-all;
+            font-family: monospace;
             font-size: 14px;
         }
-
-        .footer a {
-            color: #667eea;
-            text-decoration: none;
+        
+        .copy-btn {
+            background: #51cf66;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
         }
-
-        .template-info {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 10px 15px;
-            border-radius: 5px;
-            font-size: 12px;
-            color: #666;
+        
+        .copy-btn:hover {
+            background: #40c057;
+            transform: translateY(-2px);
+        }
+        
+        .instructions {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+            border-left: 5px solid #2196f3;
+        }
+        
+        .instructions h3 {
+            color: #1976d2;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .instructions ol {
+            margin-left: 20px;
+        }
+        
+        .instructions li {
+            margin-bottom: 8px;
+            color: #424242;
+        }
+        
+        .status-message {
+            padding: 20px;
+            text-align: center;
+            border-radius: 15px;
+            margin: 20px 0;
+            font-weight: 600;
+        }
+        
+        .status-trial {
+            background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+            color: white;
+        }
+        
+        .status-success {
+            background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
+            color: white;
+        }
+        
+        .countdown {
+            font-size: 20px;
+            font-weight: bold;
+            color: #ff5722;
+            text-align: center;
+            margin: 15px 0;
+        }
+        
+        .trial-info {
+            background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+            border-left: 5px solid #ff9800;
+            color: #e65100;
+        }
+        
+        .trial-info h4 {
+            margin-bottom: 10px;
+            color: #e65100;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        @keyframes scaleIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+        
+        /* Responsive */
+        @media (max-width: 480px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .panel {
+                padding: 25px 20px;
+            }
+            
+            .modal-content {
+                padding: 20px;
+                margin: 20px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="template-info">
-        Template 1 - Moderno
-    </div>
+    <!-- Formulário oculto para login CHAP -->
+    $(if chap-id)
+        <form name="sendin" action="$(link-login-only)" method="post" style="display:none">
+            <input type="hidden" name="username" />
+            <input type="hidden" name="password" />
+            <input type="hidden" name="dst" value="$(link-orig)" />
+            <input type="hidden" name="popup" value="true" />
+        </form>
+        
+        <script type="text/javascript">
+            function doLogin() {
+                document.sendin.username.value = document.login.username.value;
+                document.sendin.password.value = document.login.username.value;
+                document.sendin.submit();
+                return false;
+            }
+        </script>
+    $(endif)
 
-    <div class="login-container">
+    <!-- Formulário oculto para trial -->
+    <form name="trial" action="$(link-login-only)" method="post" style="display:none">
+        <input type="hidden" name="username" value="T-$(mac-esc)" />
+        <input type="hidden" name="password" value="" />
+        <input type="hidden" name="dst" value="$(link-orig)" />
+        <input type="hidden" name="popup" value="true" />
+    </form>
+
+    <div class="container">
+        <!-- Logo -->
         <div class="logo">
-            <h1>PIX Mikro</h1>
-            <p>Sistema de Captive Portal</p>
+            <img src="img/logo.png" alt="Avistão WIFI" onerror="this.style.display='none'">
         </div>
 
-        <form id="loginForm">
-            <div class="form-group">
-                <label for="email">E-mail:</label>
-                <input type="email" id="email" name="email" required placeholder="seu@email.com">
+        <!-- Painel Principal -->
+        <div class="panel">
+            <h2>Conectar ao WiFi</h2>
+
+            <!-- Alertas -->
+            <div id="alert-container">
+                $(if error)
+                <div class="alert alert-error">
+                    <strong>Erro!</strong> $(error).
+                </div>
+                $(endif)
             </div>
 
-            <div class="form-group">
-                <label for="password">Senha:</label>
-                <input type="password" id="password" name="password" required placeholder="Digite sua senha">
+            <!-- Formulário de Login -->
+            <form class="login" name="login" action="$(link-login-only)" method="post"
+                $(if chap-id) onSubmit="return doLogin()" $(endif)>
+                <input type="hidden" name="dst" value="$(link-orig)" />
+                <input type="hidden" name="popup" value="true" />
+                
+                <div class="form-group">
+                    <input type="text" name="username" class="form-input" value="$(username)" 
+                           placeholder="Digite sua senha de acesso..." />
+                    <input type="hidden" name="password" value=""/>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">
+                    CONECTAR AGORA
+                </button>
+            </form>
+
+            <!-- Divider -->
+            <div class="divider">
+                <span>OU</span>
             </div>
 
-            <button type="submit" class="login-btn">
-                Entrar no Sistema
+            <!-- Botão Comprar via PIX -->
+            <button type="button" class="btn btn-success" id="comprar-pix-btn">
+                💳 COMPRAR ACESSO VIA PIX
             </button>
-        </form>
+        </div>
+    </div>
 
-        <div class="footer">
-            <p>Não tem uma conta? <a href="#" onclick="alert('Funcionalidade em desenvolvimento')">Cadastre-se</a></p>
-            <p style="margin-top: 10px;">© 2025 PIX Mikro CRM</p>
+    <!-- Modal de Planos -->
+    <div id="planos-modal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" id="close-modal">&times;</span>
+            <h2>Escolha seu Plano de Internet</h2>
+            <div id="planos-container">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Carregando planos disponíveis...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Tutorial -->
+    <div id="tutorial-modal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" id="close-tutorial">&times;</span>
+            <h2>Como funciona o pagamento?</h2>
+            <div class="instructions">
+                <h3>📱 Processo simples em 3 passos:</h3>
+                <ol>
+                    <li><strong>Acesso liberado:</strong> Você terá 5 minutos de internet grátis para fazer o pagamento</li>
+                    <li><strong>Pague via PIX:</strong> Use seu banco ou carteira digital para pagar</li>
+                    <li><strong>Conexão automática:</strong> Após o pagamento, sua internet será liberada automaticamente</li>
+                </ol>
+            </div>
+            <div class="status-message status-trial">
+                🎯 Clique em "CONTINUAR" para gerar sua chave PIX e liberar o acesso temporário!
+            </div>
+            <button type="button" class="btn btn-success" id="continuar-btn">
+                CONTINUAR COM O PAGAMENTO
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal de Pagamento -->
+    <div id="pagamento-modal" class="modal">
+        <div class="modal-content">
+            <h2>Realize seu Pagamento</h2>
+            <div id="pagamento-container">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Gerando seu QR Code PIX...</p>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            
-            if (email && password) {
-                alert('Login realizado com sucesso!\nTemplate: 1 (Moderno)\nE-mail: ' + email);
-            } else {
-                alert('Por favor, preencha todos os campos!');
-            }
+        // Configurações globais
+        let CONFIG = {
+            mac: '',
+            mikrotik_id: '',
+            api_url: '',
+            link_login: '',
+            link_orig: ''
+        };
+
+        let selectedPlan = null;
+        let paymentData = null;
+        let pollInterval = null;
+        let trialActivated = false;
+
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', function() {
+            initializePortal();
+            setupEventListeners();
         });
-    </script>
-</body>
-</html> 
+
+        function initializePortal() {
+            // Capturar parâmetros da URL
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            CONFIG.mac = urlParams.get('mac') || '';
+            CONFIG.mikrotik_id = urlParams.get('mikrotik_id') || '';
+            CONFIG.api_url = urlParams.get('api_url') || '';
+            CONFIG.link_login = urlParams.get('link-login') || '';
+            CONFIG.link_orig = urlParams.get('link-orig') || '';
+
+            console.log('Portal inicializado com:', CONFIG);
+
+            // Focar no input de senha
+            if (document.login && document.login.username) {
+                document.login.username.focus();
+            }
+
+            // Verificar se já tem acesso
+            checkExistingAccess();
+        }
+
+        function setupEventListeners() {
+            // Botão comprar PIX
+            document.getElementById('comprar-pix-btn').addEventListener('click', openPlanosModal);
+            
+            // Fechar modais
+            document.getElementById('close-modal').addEventListener('click', closePlanosModal);
+            document.getElementById('close-tutorial').addEventListener('click', closeTutorialModal);
+            
+            // Botão continuar
+            document.getElementById('continuar-btn').addEventListener('click', handleContinuar);
+            
+            // Fechar modal clicando fora
+            window.addEventListener('click', function(event) {
+                if (event.target.classList.contains('modal')) {
+                    closeAllModals();
+                }
+            });
+        }
+
+        async function checkExistingAccess() {
+            if (!CONFIG.mac || !CONFIG.mikrotik_id || !CONFIG.api_url) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${CONFIG.api_url}/status`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        mac: CONFIG.mac,
+                        mikrotik_id: CONFIG.mikrotik_id
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.status === 'autenticado') {
+                    showAlert('success', `✅ Você já está conectado! Tempo restante: ${Math.floor(data.tempo_restante / 60)} minutos`);
+                } else if (data.status === 'pendente') {
+                    showAlert('info', '⏳ Você tem um pagamento pendente. Verifique se foi aprovado.');
+                    // Continuar polling se há pagamento pendente
+                    startPaymentPolling();
+                }
+            } catch (error) {
+                console.error('Erro ao verificar acesso:', error);
+            }
+        }
+
+        function showAlert(type, message) {
+            const container = document.getElementById('alert-container');
+            const alertClass = `alert-${type}`;
+            
+            container.innerHTML = `
+                <div class="alert ${alertClass}">
+                    ${message}
+                </div>
+            `;
+
+            // Auto remove após 5 segundos para alguns tipos
+            if (type === 'success' || type === 'info') {
+                setTimeout(() => {
+                    container.innerHTML = '';
+                }, 5000);
+            }
+        }
+
+        async function openPlanosModal() {
+            if (!CONFIG.api_url || !CONFIG.mikrotik_id) {
+                showAlert('error', '❌ Configuração inválida. Entre em contato com o suporte.');
+                return;
+            }
+
+            document.getElementById('planos-modal').style.display = 'flex';
+            await loadPlanos();
+        }
+
+        function closePlanosModal() {
+            document.getElementById('planos-modal').style.display = 'none';
+        }
+
+        function closeTutorialModal() {
+            document.getElementById('tutorial-modal').style.display = 'none';
+        }
+
+        function closeAllModals() {
+            document.getElementById('planos-modal').style.display = 'none';
+            document.getElementById('tutorial-modal').style.display = 'none';
+            document.getElementById('pagamento-modal').style.display = 'none';
+        }
+
+        async function loadPlanos() {
+            const container = document.getElementById('planos-container');
+            
+            try {
+                const response = await fetch(`${CONFIG.api_url}/planos`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        mikrotik_id: CONFIG.mikrotik_id
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.planos && data.planos.length > 0) {
+                    displayPlanos(data.planos);
+                } else {
+                    container.innerHTML = `
+                        <div class="alert alert-error">
+                            ❌ Nenhum plano disponível no momento.
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Erro ao carregar planos:', error);
+                container.innerHTML = `
+                    <div class="alert alert-error">
+                        ❌ Erro ao carregar planos. Tente novamente.
+                    </div>
+                `;
+            }
+        }
+
+        function displayPlanos(planos) {
+            const container = document.getElementById('planos-container');
+            
+            let html = '';
+            planos.forEach(plano => {
+                html += `
+                    <div class="plan-card" onclick="selectPlan('${plano.id}', '${plano.nome}', ${plano.preco}, ${plano.duracao})">
+                        <div class="plan-name">${plano.nome}</div>
+                        <div class="plan-price">R$ ${plano.preco.toFixed(2)}</div>
+                        <div class="plan-duration">${plano.duracao} minutos de acesso</div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function selectPlan(id, nome, preco, duracao) {
+            selectedPlan = { id, nome, preco, duracao };
+            
+            // Remover seleção anterior
+            document.querySelectorAll('.plan-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            
+            // Adicionar seleção atual
+            event.currentTarget.classList.add('selected');
+            
+            // Aguardar um pouco e mostrar tutorial
+            setTimeout(() => {
+                closePlanosModal();
+                document.getElementById('tutorial-modal').style.display = 'flex';
+            }, 500);
+        }
+
+        async function handleContinuar() {
+            if (!selectedPlan) {
+                showAlert('error', '❌ Nenhum plano selecionado');
+                return;
+            }
+
+            closeTutorialModal();
+            
+            // Ativar trial imediatamente
+            activateTrial();
+            
+            // Gerar PIX após 15 segundos
+            setTimeout(async () => {
+                await generatePix();
+            }, 15000);
+        }
+
+        function activateTrial() {
+            if (trialActivated) return;
+            
+            trialActivated = true;
+            showAlert('warning', '🎯 Ativando acesso temporário de 5 minutos...');
+            
+            // Simular clique no trial do Mikrotik
+            setTimeout(() => {
+                if (document.trial) {
+                    document.trial.submit();
+                }
+                showAlert('success', '✅ Acesso temporário ativado! Você tem 5 minutos para realizar o pagamento.');
+            }, 2000);
+        }
+
+        async function generatePix() {
+            document.getElementById('pagamento-modal').style.display = 'flex';
+
+            try {
+                const response = await fetch(`${CONFIG.api_url}/pix`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        mac: CONFIG.mac,
+                        mikrotik_id: CONFIG.mikrotik_id,
+                        plano_id: selectedPlan.id
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.status === 'pix_gerado') {
+                    paymentData = data;
+                    displayPaymentInfo(data);
+                    startPaymentPolling();
+                } else {
+                    throw new Error(data.error || 'Erro ao gerar PIX');
+                }
+            } catch (error) {
+                console.error('Erro ao gerar PIX:', error);
+                document.getElementById('pagamento-container').innerHTML = `
+                    <div class="alert alert-error">
+                        ❌ Erro ao gerar PIX: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        function displayPaymentInfo(data) {
+            const container = document.getElementById('pagamento-container');
+            
+            container.innerHTML = `
+                <div class="qr-container">
+                    <h3>💳 Pagamento PIX</h3>
+                    
+                    <div class="trial-info">
+                        <h4>🎯 Acesso Temporário Ativo</h4>
+                        <p>Você tem 5 minutos de internet grátis para realizar o pagamento!</p>
+                    </div>
+                    
+                    <img src="${data.qr_code_base64}" alt="QR Code PIX" class="qr-code">
+                    
+                    <h4>Ou copie e cole a chave PIX:</h4>
+                    <div class="pix-key" id="pix-key">${data.point_of_interaction.transaction_data.qr_code}</div>
+                    <button class="copy-btn" onclick="copyPixKey()">📋 COPIAR CHAVE PIX</button>
+                    
+                    <div class="status-message status-success">
+                        <strong>✅ Pronto!</strong><br>
+                        Agora vá ao seu aplicativo de banco e faça o pagamento.<br>
+                        Seu acesso será liberado automaticamente!
+                    </div>
+                    
+                    <div class="instructions">
+                        <h3>Como pagar:</h3>
+                        <ol>
+                            <li>Abra seu app do banco</li>
+                            <li>Escolha PIX</li>
+                            <li>Escaneie o QR Code ou cole a chave</li>
+                            <li>Confirme o pagamento de <strong>R$ ${selectedPlan.preco.toFixed(2)}</strong></li>
+                        </ol>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        🔄 Verificando pagamento automaticamente...
+                    </div>
+                </div>
+            `;
+        }
+
+        function copyPixKey() {
+            const pixKey = document.getElementById('pix-key').textContent;
+            
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(pixKey).then(() => {
+                    showTemporaryMessage('✅ Chave PIX copiada!');
+                });
+            } else {
+                // Fallback para dispositivos mais antigos
+                const textArea = document.createElement('textarea');
+                textArea.value = pixKey;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showTemporaryMessage('✅ Chave PIX copiada!');
+            }
+        }
+
+        function showTemporaryMessage(message) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-success';
+            alertDiv.style.position = 'fixed';
+            alertDiv.style.top = '20px';
+            alertDiv.style.left = '50%';
+            alertDiv.style.transform = 'translateX(-50%)';
+            alertDiv.style.zIndex = '9999';
+            alertDiv.textContent = message;
+            
+            document.body.appendChild(alertDiv);
+            
+            setTimeout(() => {
+                document.body.removeChild(alertDiv);
+            }, 3000);
+        }
+
+        function startPaymentPolling() {
+            if (pollInterval) {
+                clearInterval(pollInterval);
+            }
+
+            // Verificar a cada 5 segundos
+            pollInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`${CONFIG.api_url}/verify`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            mac: CONFIG.mac,
+                            mikrotik_id: CONFIG.mikrotik_id,
+                            plano_id: selectedPlan.id
+                        })
+                    });
+
+                    const data = await response.json();
+                    
+                    if (data.status === 'approved') {
+                        clearInterval(pollInterval);
+                        handlePaymentSuccess(data);
+                    }
+                } catch (error) {
+                    console.error('Erro no polling:', error);
+                }
+            }, 5000);
+
+            // Parar polling após 10 minutos
+            setTimeout(() => {
+                if (pollInterval) {
+                    clearInterval(pollInterval);
+                }
+            }, 600000);
+        }
+
+        function handlePaymentSuccess(data) {
+            closeAllModals();
+            
+            showAlert('success', `🎉 Pagamento aprovado! Conectando automaticamente...<br>
+                <strong>Usuário:</strong> ${data.username}<br>
+                <strong>Senha:</strong> ${data.password}<br>
+                <strong>Plano:</strong> ${selectedPlan.nome}`);
+
+            // Auto-conectar após 3 segundos
+            setTimeout(() => {
+                if (document.login) {
+                    document.login.username.value = data.username;
+                    document.login.submit();
+                }
+            }, 3000);
+        }
