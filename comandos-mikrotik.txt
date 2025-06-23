@@ -1,0 +1,26 @@
+COMANDOS PARA CONFIGURAR HEARTBEAT NO MIKROTIK
+==============================================
+
+1. ADICIONAR SCRIPT BÁSICO:
+/system script add name="heartbeat-teste" source="# TESTE BÁSICO DE HEARTBEAT\r\n:put \"=== TESTE HEARTBEAT ===\"\r\n\r\n# Configurações\r\n:local url \"https://api.lucro.top/api/mikrotik/heartbeat\"\r\n:local id \"78957cd3-7096-4acd-970b-0aa0a768c555\"\r\n:local token \"mtk_241ca9a5_cb1f8255\"\r\n\r\n# Capturar dados do sistema\r\n:local res [/system resource print as-value]\r\n:local ver (\$res->0->\"version\")\r\n:local up (\$res->0->\"uptime\")\r\n\r\n:put \"Versão: \$ver\"\r\n:put \"Uptime: \$up\"\r\n\r\n# Preparar JSON\r\n:local json \"{\\\"mikrotik_id\\\":\\\"\$id\\\",\\\"token\\\":\\\"\$token\\\",\\\"version\\\":\\\"\$ver\\\",\\\"uptime\\\":\\\"\$up\\\"}\"\r\n\r\n:put \"JSON: \$json\"\r\n\r\n# Enviar\r\n:do {\r\n    :local result [/tool fetch url=\$url http-method=post http-header-field=\"Content-Type:application/json\" http-data=\$json as-value]\r\n    :put \"Resultado: \$(\$result->\\\"status\\\")\"\r\n} on-error={\r\n    :put \"ERRO no envio\"\r\n}\r\n\r\n:put \"=== FIM TESTE ==="
+
+2. TESTAR SCRIPT:
+/system script run heartbeat-teste
+
+3. CRIAR SCHEDULER (se o teste funcionar):
+/system scheduler add name="heartbeat-scheduler" interval=5m on-event=heartbeat-teste
+
+4. VERIFICAR SE ESTÁ FUNCIONANDO:
+/log print where topics~"script"
+
+5. REMOVER SCHEDULER (se necessário):
+/system scheduler remove heartbeat-scheduler
+
+6. REMOVER SCRIPT (se necessário):
+/system script remove heartbeat-teste
+
+OBSERVAÇÕES:
+- O script vai aparecer no log do MikroTik
+- Se der erro de conectividade, verifique se o MikroTik tem acesso à internet
+- Se der erro de token, verifique se o token está correto na API
+- O heartbeat deve aparecer no frontend após alguns minutos 
