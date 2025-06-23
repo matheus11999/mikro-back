@@ -1,0 +1,30 @@
+COMANDOS PARA MIKROTIK HEARTBEAT - DADOS DO SUPABASE
+====================================================
+
+1. ADICIONAR SCRIPT:
+/system script add name="heartbeat-drogaria" source=":local url \"https://api.lucro.top/api/mikrotik/heartbeat\"\r\n:local id \"78957cd3-7096-4acd-970b-0aa0a768c555\"\r\n:local token \"mtk_241ca9a5_cb1f8255\"\r\n:local res [/system resource print as-value]\r\n:local ver (\$res->0->\"version\")\r\n:local up (\$res->0->\"uptime\")\r\n:local json \"{\\\"mikrotik_id\\\":\\\"\$id\\\",\\\"token\\\":\\\"\$token\\\",\\\"version\\\":\\\"\$ver\\\",\\\"uptime\\\":\\\"\$up\\\"}\"\r\n:do {\r\n[/tool fetch url=\$url http-method=post http-header-field=\"Content-Type:application/json\" http-data=\$json]\r\n} on-error={}"
+
+2. TESTAR SCRIPT:
+/system script run heartbeat-drogaria
+
+3. CRIAR SCHEDULER (5 minutos):
+/system scheduler add name="heartbeat-scheduler" interval=5m on-event=heartbeat-drogaria
+
+4. VERIFICAR LOGS:
+/log print where topics~"script"
+
+5. LISTAR SCRIPTS:
+/system script print
+
+6. LISTAR SCHEDULERS:
+/system scheduler print
+
+7. REMOVER SE NECESSÁRIO:
+/system scheduler remove heartbeat-scheduler
+/system script remove heartbeat-drogaria
+
+DADOS UTILIZADOS (do Supabase):
+- MikroTik ID: 78957cd3-7096-4acd-970b-0aa0a768c555
+- Nome: Drogaria  
+- Token: mtk_241ca9a5_cb1f8255
+- API URL: https://api.lucro.top/api/mikrotik/heartbeat 

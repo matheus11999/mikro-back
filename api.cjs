@@ -2180,34 +2180,68 @@ app.get('/api/mikrotik/status', async (req, res, next) => {
   }
 });
 
+// Middleware para bloquear tentativas de acesso a arquivos sensíveis
+app.use((req, res, next) => {
+  const suspiciousPatterns = [
+    /\.env/i,
+    /\.git/i,
+    /\.aws/i,
+    /config/i,
+    /phpinfo/i,
+    /\.php$/i,
+    /\.yml$/i,
+    /\.yaml$/i,
+    /\.json$/i,
+    /\.js$/i,
+    /\.py$/i
+  ];
+  
+  const isSuspicious = suspiciousPatterns.some(pattern => pattern.test(req.path));
+  
+  if (isSuspicious && !req.path.startsWith('/api/')) {
+    console.log(`[SECURITY] Bloqueando acesso suspeito: ${req.path} de ${req.ip}`);
+    return res.status(404).json({ error: 'Not found' });
+  }
+  
+  next();
+});
+
 // Registra o middleware de erro no final
 app.use(errorHandler);
 
-const FRONTEND_BUILD_PATH = process.env.FRONTEND_BUILD_PATH || path.join(__dirname, 'dist');
-
-// Servir frontend se APP_MODE=backend ou both e existir build
-if (process.env.APP_MODE !== 'frontend') {
-  app.use(express.static(FRONTEND_BUILD_PATH));
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(FRONTEND_BUILD_PATH, 'index.html'));
+// Endpoint de saúde da API
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    service: 'PIX Mikro API'
   });
-}
+});
+
+// Fallback para rotas não encontradas (apenas API)
+app.use('*', (req, res) => {
+  if (req.originalUrl.startsWith('/api/')) {
+    res.status(404).json({ error: 'API endpoint not found' });
+  } else {
+    res.status(404).json({ 
+      error: 'This is an API server. Frontend should be served separately.',
+      api_docs: '/health'
+    });
+  }
+});
 
 
 
 // Porta
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
-  console.log(`Servidor rodando na porta ${port}`);
-  if (process.env.APP_MODE === 'backend' || !process.env.APP_MODE) {
-    console.log(`API disponível em: http://localhost:${port}/`);
-  }
-  if (process.env.APP_MODE === 'both') {
-    console.log(`API disponível em: http://localhost:${port}/`);
-    console.log(`Frontend disponível em: http://localhost:${process.env.FRONTEND_PORT || 5173}/`);
-  }
-  
-  // Sistema de polling removido - usando apenas webhook do Mercado Pago
-  console.log('[WEBHOOK MP] Sistema configurado para usar apenas webhook do Mercado Pago');
+  console.log('='.repeat(50));
+  console.log(`🚀 PIX MIKRO API - Servidor iniciado`);
+  console.log(`📡 API disponível em: http://localhost:${port}/`);
+  console.log(`🏥 Health check: http://localhost:${port}/health`);
+  console.log(`🔒 Middleware de segurança ativo`);
+  console.log(`💳 Webhook Mercado Pago configurado`);
+  console.log(`💓 Sistema de heartbeat MikroTik ativo`);
+  console.log('='.repeat(50));
 }); 
 
