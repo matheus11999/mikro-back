@@ -1934,6 +1934,148 @@ app.get('/api/mikrotik/auth-notification/test', (req, res) => {
   });
 });
 
+// ==================================================
+// ENDPOINT HEARTBEAT - MONITORAMENTO MIKROTIKS
+// ==================================================
+
+app.post('/api/mikrotik/heartbeat', async (req, res, next) => {
+  try {
+    console.log('[HEARTBEAT] Recebido heartbeat:', req.body);
+
+    const { mikrotik_id, token, version, uptime } = req.body;
+
+    // Validação básica
+    if (!mikrotik_id) {
+      throw {
+        message: 'mikrotik_id obrigatório',
+        code: 'VALIDATION_ERROR',
+        details: 'O ID do Mikrotik é obrigatório para heartbeat',
+        source: 'API'
+      };
+    }
+
+    // Validação do token (básica)
+    if (!token || token.length < 10) {
+      throw {
+        message: 'Token inválido',
+        code: 'VALIDATION_ERROR',
+        details: 'Token de heartbeat é obrigatório',
+        source: 'API'
+      };
+    }
+
+    const agora = new Date().toISOString();
+
+    console.log('[HEARTBEAT] Atualizando último heartbeat para Mikrotik:', mikrotik_id);
+
+    // Atualizar último heartbeat do Mikrotik
+    const mikrotikAtualizado = await handleSupabaseOperation(() =>
+      supabaseAdmin
+        .from('mikrotiks')
+        .update({ 
+          ultimo_heartbeat: agora,
+          heartbeat_version: version || null,
+          heartbeat_uptime: uptime || null
+        })
+        .eq('id', mikrotik_id)
+        .select('id, nome, ultimo_heartbeat, heartbeat_version, heartbeat_uptime')
+        .single()
+    );
+
+    if (!mikrotikAtualizado) {
+      throw {
+        message: 'Mikrotik não encontrado',
+        code: 'NOT_FOUND',
+        details: `Mikrotik com ID ${mikrotik_id} não foi encontrado`,
+        source: 'API'
+      };
+    }
+
+    console.log('[HEARTBEAT] Heartbeat registrado com sucesso:', {
+      mikrotik_id: mikrotikAtualizado.id,
+      nome: mikrotikAtualizado.nome,
+      ultimo_heartbeat: mikrotikAtualizado.ultimo_heartbeat,
+      version: mikrotikAtualizado.heartbeat_version,
+      uptime: mikrotikAtualizado.heartbeat_uptime
+    });
+
+    res.json({
+      success: true,
+      message: 'Heartbeat registrado com sucesso',
+      data: {
+        mikrotik_id: mikrotikAtualizado.id,
+        nome: mikrotikAtualizado.nome,
+        ultimo_heartbeat: mikrotikAtualizado.ultimo_heartbeat,
+        version: mikrotikAtualizado.heartbeat_version,
+        uptime: mikrotikAtualizado.heartbeat_uptime,
+        timestamp: agora
+      }
+    });
+
+  } catch (err) {
+    console.error('[HEARTBEAT] Erro ao processar heartbeat:', err);
+    next(err);
+  }
+});
+
+// Endpoint para verificar status de MikroTiks online/offline
+app.get('/api/mikrotik/status', async (req, res, next) => {
+  try {
+    console.log('[MIKROTIK STATUS] Verificando status dos MikroTiks...');
+
+    // Buscar todos os MikroTiks
+    const mikrotiks = await handleSupabaseOperation(() =>
+      supabaseAdmin
+        .from('mikrotiks')
+        .select('id, nome, ultimo_heartbeat, heartbeat_version, heartbeat_uptime, status, cliente_id')
+        .order('nome')
+    );
+
+    const agora = new Date();
+    const limiteOffline = 15 * 60 * 1000; // 15 minutos em milliseconds
+
+    // Determinar status online/offline baseado no último heartbeat
+    const mikrotiksComStatus = mikrotiks.map(mikrotik => {
+      let isOnline = false;
+      let minutosOffline = null;
+
+      if (mikrotik.ultimo_heartbeat) {
+        const ultimoHeartbeat = new Date(mikrotik.ultimo_heartbeat);
+        const diffMs = agora.getTime() - ultimoHeartbeat.getTime();
+        minutosOffline = Math.floor(diffMs / (1000 * 60));
+        isOnline = diffMs < limiteOffline;
+      }
+
+      return {
+        ...mikrotik,
+        is_online: isOnline,
+        minutos_offline: minutosOffline,
+        status_conexao: isOnline ? 'online' : 'offline'
+      };
+    });
+
+    const estatisticas = {
+      total: mikrotiksComStatus.length,
+      online: mikrotiksComStatus.filter(m => m.is_online).length,
+      offline: mikrotiksComStatus.filter(m => !m.is_online).length,
+      nunca_conectou: mikrotiksComStatus.filter(m => !m.ultimo_heartbeat).length
+    };
+
+    console.log('[MIKROTIK STATUS] Estatísticas:', estatisticas);
+
+    res.json({
+      success: true,
+      data: mikrotiksComStatus,
+      estatisticas,
+      limite_offline_minutos: 15
+    });
+
+  } catch (err) {
+    console.error('[MIKROTIK STATUS] Erro ao verificar status:', err);
+    next(err);
+  }
+});
+
 // Registra o middleware de erro no final
 app.use(errorHandler);
 
