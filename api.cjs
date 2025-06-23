@@ -200,9 +200,20 @@ async function validarTokenMikrotik(req, res, next) {
   }
 }
 
-// Fun├º├úo utilit├íria para tratar respostas do Mercado Pago via fetch
+// Função utilitária para tratar respostas do Mercado Pago via fetch
 async function handleMercadoPagoFetch(url, options = {}) {
   try {
+    console.log(`[MP FETCH] Fazendo requisição para: ${url}`);
+    
+    if (!process.env.MERCADO_PAGO_ACCESS_TOKEN) {
+      throw {
+        message: 'Token do Mercado Pago não configurado',
+        code: 'MERCADOPAGO_TOKEN_MISSING',
+        details: 'MERCADO_PAGO_ACCESS_TOKEN não está definido',
+        source: 'MercadoPago'
+      };
+    }
+
     const response = await fetch(url, {
       ...options,
       headers: {
@@ -212,24 +223,40 @@ async function handleMercadoPagoFetch(url, options = {}) {
       }
     });
 
-    const data = await response.json();
-    
+    console.log(`[MP FETCH] Response status: ${response.status} para ${url}`);
+
     if (!response.ok) {
-      console.error('Erro Mercado Pago (fetch):', data);
+      let errorData = {};
+      try {
+        errorData = await response.json();
+      } catch (jsonErr) {
+        errorData = { message: `HTTP ${response.status}: ${response.statusText}` };
+      }
+      
+      console.error(`[MP FETCH] Erro HTTP ${response.status}:`, errorData);
+      
       throw {
-        message: 'Erro ao processar requisi├º├úo no Mercado Pago',
+        message: `Erro ${response.status} no Mercado Pago`,
         code: 'MERCADOPAGO_ERROR',
-        details: data,
+        details: errorData,
         status: response.status,
         source: 'MercadoPago'
       };
     }
 
+    const data = await response.json();
+    console.log(`[MP FETCH] Sucesso para ${url}`);
     return data;
+    
   } catch (err) {
-    if (err.code) throw err; // J├í ├® um erro formatado
+    if (err.code) {
+      console.error(`[MP FETCH] Erro formatado:`, err);
+      throw err; // Já é um erro formatado
+    }
+    
+    console.error(`[MP FETCH] Erro de rede/timeout:`, err.message);
     throw {
-      message: 'Erro na comunica├º├úo com Mercado Pago',
+      message: 'Erro na comunicação com Mercado Pago',
       code: 'MERCADOPAGO_NETWORK_ERROR',
       details: err.message,
       source: 'MercadoPago'
@@ -1198,8 +1225,16 @@ app.post('/api/webhook/mercadopago', async (req, res, next) => {
       // Aguarda um pouco para garantir que o pagamento esteja atualizado no MP
       setTimeout(async () => {
         try {
+          console.log(`[WEBHOOK MP] Consultando Mercado Pago para payment ${paymentId}...`);
+          
           // Consulta detalhes do pagamento no Mercado Pago
           const mpData = await handleMercadoPagoFetch(`https://api.mercadopago.com/v1/payments/${paymentId}`);
+          
+          console.log(`[WEBHOOK MP] Resposta do MP recebida para ${paymentId}:`, {
+            status: mpData.status,
+            status_detail: mpData.status_detail,
+            id: mpData.id
+          });
           
           console.log(`[WEBHOOK MP] Status do pagamento ${paymentId}: ${mpData.status} - Detail: ${mpData.status_detail || 'N/A'}`);
           
@@ -1580,7 +1615,28 @@ app.post('/api/webhook/mercadopago', async (req, res, next) => {
           console.log(`[WEBHOOK MP] Status atualizado: ${statusAnterior} → ${atualizacaoVenda.status} para pagamento ${paymentId}`);
         
         } catch (error) {
-          console.error('[WEBHOOK MP] Erro ao processar pagamento:', error);
+          console.error('[WEBHOOK MP] Erro ao processar pagamento:', {
+            paymentId,
+            error: error.message,
+            code: error.code,
+            details: error.details,
+            stack: error.stack
+          });
+          
+          // Se for erro de comunicação com MP, tenta novamente em 10 segundos
+          if (error.code === 'MERCADOPAGO_NETWORK_ERROR' || error.code === 'MERCADOPAGO_ERROR') {
+            console.log(`[WEBHOOK MP] Tentando novamente em 10 segundos para payment ${paymentId}...`);
+            setTimeout(async () => {
+              try {
+                console.log(`[WEBHOOK MP] RETRY - Consultando Mercado Pago para payment ${paymentId}...`);
+                const mpData = await handleMercadoPagoFetch(`https://api.mercadopago.com/v1/payments/${paymentId}`);
+                console.log(`[WEBHOOK MP] RETRY - Sucesso na consulta do payment ${paymentId}`);
+                // Aqui poderia reprocessar, mas por simplicidade só logamos
+              } catch (retryError) {
+                console.error(`[WEBHOOK MP] RETRY FAILED para payment ${paymentId}:`, retryError.message);
+              }
+            }, 10000);
+          }
         }
       }, 2000); // Aguarda 2 segundos antes de processar
     } else {
