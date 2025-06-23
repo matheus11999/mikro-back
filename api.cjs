@@ -955,7 +955,7 @@ app.post('/api/captive-check/status', async (req, res, next) => {
         fim: senhaValida.data ? new Date(new Date(senhaValida.data).getTime() + (senhaValida.plano_id?.duracao || 60) * 60000).toISOString() : null
       });
     }
-    // Se n├úo houver venda, retorna precisa_comprar e estat├¡sticas
+    // Se n├úo houver venda, retorna precisa_comprar e estat├ísticas
     return res.json({
       status: 'precisa_comprar',
       mac: macObj.mac_address,
@@ -1886,35 +1886,34 @@ app.post('/api/webhook/mercadopago/test', async (req, res) => {
   }
 });
 
-// Endpoint para listar MACs que compraram senhas nos últimos 5 minutos e estão DESCONECTADOS
+// Endpoint para listar MACs que compraram senhas nas últimas 4 horas e estão DESCONECTADOS
 app.post('/api/recent-sales', validarTokenMikrotik, async (req, res, next) => {
   try {
     const mikrotik_id = req.mikrotik_id; // Já validado pelo middleware
     
-    console.log(`[${formatDateWithTimezone()}] [RECENT-SALES] Buscando vendas dos últimos 5 minutos para mikrotik:`, req.mikrotik.nome);
+    console.log(`[${formatDateWithTimezone()}] [RECENT-SALES] Buscando vendas das últimas 4 horas para mikrotik:`, req.mikrotik.nome);
 
-    // Data dos últimos 5 minutos
+    // Data das últimas 4 horas
     const agora = new Date();
-    const cincoMinutosAtras = new Date(agora.getTime() - 5 * 60 * 1000); // 5 minutos atrás
+    const quatroHorasAtras = new Date(agora.getTime() - 4 * 60 * 60 * 1000); // 4 horas atrás
 
-    // Buscar vendas aprovadas dos últimos 5 minutos para MACs que estão DESCONECTADOS
+    // Buscar vendas aprovadas das últimas 4 horas para MACs que estão DESCONECTADOS
     const vendas = await handleSupabaseOperation(() =>
       supabaseAdmin
         .from('vendas')
         .select(`
           *,
           mac_id (mac_address, status),
-          senha_id (usuario, senha),
           plano_id (nome, duracao)
         `)
         .eq('mikrotik_id', mikrotik_id)
         .eq('status', 'aprovado')
-        .gte('pagamento_aprovado_em', cincoMinutosAtras.toISOString())
+        .gte('pagamento_aprovado_em', quatroHorasAtras.toISOString())
         .order('pagamento_aprovado_em', { ascending: false })
     );
 
     if (!vendas || vendas.length === 0) {
-      console.log('[RECENT-SALES] Nenhuma venda encontrada nos últimos 5 minutos');
+      console.log('[RECENT-SALES] Nenhuma venda encontrada nas últimas 4 horas');
       return res.send('');
     }
 
@@ -1937,14 +1936,12 @@ app.post('/api/recent-sales', validarTokenMikrotik, async (req, res, next) => {
       return res.send('');
     }
 
-    // Formatar dados no formato solicitado: user-senha-mac-minutos
+    // Formatar dados no formato solicitado: mac-minutos
     const vendasFormatadas = vendasDesconectadas.map(venda => {
-      const usuario = venda.senha_id?.usuario || 'N/A';
-      const senha = venda.senha_id?.senha || 'N/A';
       const mac = venda.mac_id?.mac_address || 'N/A';
       const minutos = venda.plano_id?.duracao || 0;
       
-      return `${usuario}-${senha}-${mac}-${minutos}`;
+      return `${mac}-${minutos}`;
     });
 
     console.log(`[RECENT-SALES] Encontradas ${vendas.length} vendas totais, ${vendasDesconectadas.length} de MACs desconectados`);
