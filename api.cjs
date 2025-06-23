@@ -86,8 +86,8 @@ async function verificarPagamentosPendentesStartup() {
         .select('*, mac_id(*), plano_id(*), mikrotik_id(*)')
         .in('status', statusPendentes)
         .not('payment_id', 'is', null)
-        .gte('created_at', quatroHorasAtras)
-        .order('created_at', { ascending: false })
+        .gte('data', quatroHorasAtras)
+        .order('data', { ascending: false })
         .limit(50) // Limita a 50 para não sobrecarregar
     );
 
