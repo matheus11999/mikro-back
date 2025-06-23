@@ -1284,42 +1284,6 @@ app.post('/api/webhook/mercadopago', async (req, res, next) => {
             
             console.log(`[WEBHOOK MP] Processando aprovação do pagamento ${paymentId}...`);
             
-            // Busca senha disponível
-            let senha = null;
-            try {
-              const senhasDisponiveis = await handleSupabaseOperation(() =>
-                supabaseAdmin
-                  .from('senhas')
-                  .select('*')
-                  .eq('plano_id', venda.plano_id.id)
-                  .eq('vendida', false)
-                  .limit(1)
-              );
-              
-              if (senhasDisponiveis && senhasDisponiveis.length > 0) {
-                senha = senhasDisponiveis[0];
-              }
-            } catch (err) {
-              console.error(`[WEBHOOK MP] Erro ao buscar senhas:`, err);
-            }
-            
-            if (!senha) {
-              console.error(`[WEBHOOK MP] Sem senhas disponíveis para o plano ${venda.plano_id.id}`);
-              // Aqui você pode implementar uma notificação para o admin
-              return;
-            }
-            
-            // Marca senha como vendida
-            await handleSupabaseOperation(() =>
-              supabaseAdmin
-                .from('senhas')
-                .update({ 
-                  vendida: true,
-                  vendida_em: agora
-                })
-                .eq('id', senha.id)
-            );
-            
             // Busca informações do mikrotik
             const mikrotikInfo = await handleSupabaseOperation(() =>
               supabaseAdmin
@@ -1352,7 +1316,6 @@ app.post('/api/webhook/mercadopago', async (req, res, next) => {
               ...atualizacaoVenda,
               status: 'aprovado',
               pagamento_aprovado_em: agora,
-              senha_id: senha.id,
               lucro: comissaoAdmin,
               valor: comissaoDono
             };
@@ -1374,7 +1337,7 @@ app.post('/api/webhook/mercadopago', async (req, res, next) => {
             );
             
             console.log(`[WEBHOOK MP] Pagamento ${paymentId} APROVADO e processado com sucesso!`);
-            console.log(`[WEBHOOK MP] Senha entregue: ${senha.usuario}`);
+            console.log(`[WEBHOOK MP] Saldos creditados - Admin: R$ ${comissaoAdmin.toFixed(2)}, Cliente: R$ ${comissaoDono.toFixed(2)}`);
 
           } else if (mpData.status === 'rejected') {
             // PAGAMENTO REJEITADO
@@ -1477,18 +1440,7 @@ app.post('/api/webhook/mercadopago', async (req, res, next) => {
                   }
                 }
                 
-                // Marcar senha como não vendida (se houver)
-                if (venda.senha_id) {
-                  await handleSupabaseOperation(() =>
-                    supabaseAdmin
-                      .from('senhas')
-                      .update({ 
-                        vendida: false,
-                        vendida_em: null
-                      })
-                      .eq('id', venda.senha_id)
-                  );
-                }
+                // Sistema sem senhas - não há necessidade de liberar senhas
                 
                 console.log(`[WEBHOOK MP] Saldos revertidos para pagamento ${paymentId}`);
               } catch (err) {
