@@ -55,9 +55,234 @@ const supabaseAdmin = createClient(
   }
 );
 
-// Mercado Pago ser├í acessado via fetch API diretamente
+// Mercado Pago será acessado via fetch API diretamente
 
-// Configura├º├úo do Express
+// Função para verificar pagamentos pendentes no startup
+async function verificarPagamentosPendentesStartup() {
+  try {
+    console.log('\n🔍 VERIFICANDO PAGAMENTOS PENDENTES NO STARTUP...');
+    console.log('='.repeat(60));
+    
+    // Buscar vendas com status pendente, processando, autorizado ou criado
+    const statusPendentes = ['pendente', 'processando', 'autorizado', 'criado'];
+    
+    const vendasPendentes = await handleSupabaseOperation(() =>
+      supabaseAdmin
+        .from('vendas')
+        .select('*, mac_id(*), plano_id(*), mikrotik_id(*)')
+        .in('status', statusPendentes)
+        .not('payment_id', 'is', null)
+        .order('criado_em', { ascending: false })
+        .limit(50) // Limita a 50 para não sobrecarregar
+    );
+
+    if (!vendasPendentes || vendasPendentes.length === 0) {
+      console.log('✅ Nenhum pagamento pendente encontrado');
+      console.log('='.repeat(60));
+      return;
+    }
+
+    console.log(`📊 Encontradas ${vendasPendentes.length} vendas pendentes para verificar`);
+    console.log('='.repeat(60));
+
+    let processadas = 0;
+    let aprovadas = 0;
+    let rejeitadas = 0;
+    let outros = 0;
+
+    // Processa cada venda pendente
+    for (const venda of vendasPendentes) {
+      try {
+        console.log(`\n🔄 Verificando payment_id: ${venda.payment_id} (Status atual: ${venda.status})`);
+        
+        // Consulta o status atual no Mercado Pago
+        const mpData = await handleMercadoPagoFetch(`https://api.mercadopago.com/v1/payments/${venda.payment_id}`);
+        
+        console.log(`   📡 Status no MP: ${mpData.status} (${mpData.status_detail || 'N/A'})`);
+        
+        // Se o status mudou, processa a atualização
+        if (mpData.status !== venda.status) {
+          console.log(`   🔄 Status mudou de "${venda.status}" para "${mpData.status}" - processando...`);
+          
+          const agora = new Date().toISOString();
+          let atualizacaoVenda = {
+            ultima_atualizacao_status: agora
+          };
+
+          // Adiciona campos específicos se existirem
+          try {
+            atualizacaoVenda.mercado_pago_status = mpData.status;
+            atualizacaoVenda.status_detail = mpData.status_detail || null;
+          } catch (err) {
+            console.log('   ⚠️  Campos novos não existem, continuando...');
+          }
+
+          if (mpData.status === 'approved') {
+            // PAGAMENTO APROVADO
+            console.log(`   ✅ APROVANDO pagamento ${venda.payment_id}...`);
+            
+            // Busca informações do mikrotik
+            const mikrotikInfo = await handleSupabaseOperation(() =>
+              supabaseAdmin
+                .from('mikrotiks')
+                .select('cliente_id, profitpercentage')
+                .eq('id', venda.mikrotik_id.id)
+                .single()
+            );
+            
+            // Calcula comissões
+            let porcentagemAdmin = mikrotikInfo?.profitpercentage || 10;
+            if (porcentagemAdmin > 100) porcentagemAdmin = 100;
+            if (porcentagemAdmin < 0) porcentagemAdmin = 0;
+            
+            const comissaoAdmin = venda.preco * (porcentagemAdmin / 100);
+            const comissaoDono = venda.preco - comissaoAdmin;
+            
+            // Atualiza saldos
+            await supabaseAdmin.rpc('incrementar_saldo_admin', { valor: comissaoAdmin });
+            
+            if (mikrotikInfo?.cliente_id) {
+              await supabaseAdmin.rpc('incrementar_saldo_cliente', { 
+                cliente_id: mikrotikInfo.cliente_id, 
+                valor: comissaoDono 
+              });
+            }
+            
+            // Atualiza venda
+            atualizacaoVenda = {
+              ...atualizacaoVenda,
+              status: 'aprovado',
+              pagamento_aprovado_em: agora,
+              lucro: comissaoAdmin,
+              valor: comissaoDono
+            };
+            
+            // Atualiza MAC
+            await handleSupabaseOperation(() =>
+              supabaseAdmin
+                .from('macs')
+                .update({
+                  total_gasto: (venda.mac_id.total_gasto || 0) + Number(venda.preco),
+                  total_compras: (venda.mac_id.total_compras || 0) + 1,
+                  ultimo_plano: venda.plano_id.nome,
+                  ultimo_valor: venda.preco,
+                  ultimo_acesso: agora,
+                  status_pagamento: 'aprovado',
+                  pagamento_aprovado_em: agora
+                })
+                .eq('id', venda.mac_id.id)
+            );
+            
+            console.log(`   💰 Saldos creditados - Admin: R$ ${comissaoAdmin.toFixed(2)}, Cliente: R$ ${comissaoDono.toFixed(2)}`);
+            aprovadas++;
+
+          } else if (mpData.status === 'rejected') {
+            // PAGAMENTO REJEITADO
+            console.log(`   ❌ REJEITANDO pagamento ${venda.payment_id}...`);
+            
+            atualizacaoVenda = {
+              ...atualizacaoVenda,
+              status: 'rejeitado'
+            };
+
+            try {
+              atualizacaoVenda.pagamento_rejeitado_em = agora;
+            } catch (err) {}
+
+            await handleSupabaseOperation(() =>
+              supabaseAdmin
+                .from('macs')
+                .update({ status_pagamento: 'rejeitado' })
+                .eq('id', venda.mac_id.id)
+            );
+            
+            rejeitadas++;
+
+          } else if (mpData.status === 'cancelled') {
+            // PAGAMENTO CANCELADO
+            console.log(`   🚫 CANCELANDO pagamento ${venda.payment_id}...`);
+            
+            atualizacaoVenda = {
+              ...atualizacaoVenda,
+              status: 'cancelado'
+            };
+
+            try {
+              atualizacaoVenda.pagamento_cancelado_em = agora;
+            } catch (err) {}
+
+            await handleSupabaseOperation(() =>
+              supabaseAdmin
+                .from('macs')
+                .update({ status_pagamento: 'cancelado' })
+                .eq('id', venda.mac_id.id)
+            );
+            
+            outros++;
+
+          } else if (mpData.status === 'expired') {
+            // PAGAMENTO EXPIRADO
+            console.log(`   ⏰ EXPIRANDO pagamento ${venda.payment_id}...`);
+            
+            atualizacaoVenda = {
+              ...atualizacaoVenda,
+              status: 'expirado'
+            };
+
+            try {
+              atualizacaoVenda.pagamento_expirado_em = agora;
+            } catch (err) {}
+            
+            outros++;
+
+          } else {
+            // OUTROS STATUS
+            console.log(`   📝 Atualizando para status "${mpData.status}"`);
+            atualizacaoVenda = {
+              ...atualizacaoVenda,
+              status: mpData.status
+            };
+            outros++;
+          }
+
+          // Atualiza a venda no banco
+          await handleSupabaseOperation(() =>
+            supabaseAdmin
+              .from('vendas')
+              .update(atualizacaoVenda)
+              .eq('id', venda.id)
+          );
+
+          console.log(`   ✅ Venda atualizada com sucesso!`);
+          processadas++;
+
+        } else {
+          console.log(`   ⭕ Status inalterado (${mpData.status})`);
+        }
+
+        // Pequena pausa entre consultas para não sobrecarregar a API
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+      } catch (error) {
+        console.error(`   ❌ Erro ao verificar payment_id ${venda.payment_id}:`, error.message);
+      }
+    }
+
+    console.log('\n' + '='.repeat(60));
+    console.log('📊 RESUMO DA VERIFICAÇÃO:');
+    console.log(`   🔄 Total verificadas: ${vendasPendentes.length}`);
+    console.log(`   ✅ Processadas: ${processadas}`);
+    console.log(`   💚 Aprovadas: ${aprovadas}`);
+    console.log(`   ❌ Rejeitadas: ${rejeitadas}`);
+    console.log(`   📝 Outros status: ${outros}`);
+    console.log('='.repeat(60));
+
+  } catch (error) {
+    console.error('❌ Erro na verificação de pagamentos pendentes:', error);
+  }
+}
+
+// Configuração do Express
 const app = express();
 app.use(express.json());
 app.use(cors());
@@ -2260,5 +2485,10 @@ app.listen(port, () => {
   console.log(`💳 Webhook Mercado Pago configurado`);
   console.log(`💓 Sistema de heartbeat MikroTik ativo`);
   console.log('='.repeat(50));
+  
+  // Aguarda 3 segundos e então verifica pagamentos pendentes
+  setTimeout(() => {
+    verificarPagamentosPendentesStartup();
+  }, 3000);
 }); 
 
