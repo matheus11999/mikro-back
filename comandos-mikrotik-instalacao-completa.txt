@@ -1,0 +1,49 @@
+# ============================================================================
+# COMANDOS PARA INSTALAÇÃO COMPLETA - MIKROTIK
+# API: https://api.lucro.top
+# MikroTik ID: 78957cd3-7096-4acd-970b-0aa0a768c555
+# Token: mtk_241ca9a5_cb1f8255
+# ============================================================================
+# IMPORTANTE: Copie e cole cada comando separadamente no terminal do MikroTik
+# Aguarde a confirmação de cada comando antes de colar o próximo
+# ============================================================================
+
+# PASSO 1: Script Verificador de Pagamentos (40 segundos)
+/system script add name="pix-verificador" source=":local apiUrl \"https://api.lucro.top/api/recent-sales\"; :local mikrotikId \"78957cd3-7096-4acd-970b-0aa0a768c555\"; :local apiToken \"mtk_241ca9a5_cb1f8255\"; :log info \"PIX iniciado\"; :local macs \"\"; :for tentativa from=1 to=5 do={ :log info \"Tentativa \$tentativa\"; :local jsonData \"{\\\"mikrotik_id\\\":\\\"\\$mikrotikId\\\",\\\"token\\\":\\\"\\$apiToken\\\"}\"; /tool fetch url=\$apiUrl http-method=post http-header-field=\"Content-Type:application/json\" http-data=\$jsonData dst-path=\"vendas.txt\"; :delay 2s; :local vendas [/file get [find name=\"vendas.txt\"] contents]; /file remove [find name=\"vendas.txt\"]; :if ([:len \$vendas] > 0) do={ :local pos [:find \$vendas \"-\"]; :if (\$pos >= 0) do={ :local mac [:pick \$vendas 0 \$pos]; :local minutos [:tonum [:pick \$vendas (\$pos + 1) [:len \$vendas]]]; :log info \"MAC: \$mac, Min: \$minutos\"; :if ([:find \$macs \$mac] < 0) do={ :do { /ip hotspot ip-binding remove [find mac-address=\$mac] } on-error={}; :local agora [/system clock get time]; :local h [:tonum [:pick \$agora 0 2]]; :local m [:tonum [:pick \$agora 3 5]]; :local novoMin ((\$h * 60) + \$m + \$minutos); :local novaH (\$novoMin / 60); :local novaM (\$novoMin % 60); :if (\$novaH >= 24) do={ :set novaH (\$novaH - 24) }; :local hs [:tostr \$novaH]; :local ms [:tostr \$novaM]; :if ([:len \$hs] = 1) do={ :set hs (\"0\" . \$hs) }; :if ([:len \$ms] = 1) do={ :set ms (\"0\" . \$ms) }; :local dataExpire ([/system clock get date] . \"-\" . \$hs . \$ms); :local comentario (\"PIX-EXPIRE-\" . \$dataExpire . \"-\" . \$mac); /ip hotspot ip-binding add mac-address=\$mac type=bypassed comment=\$comentario; :log info \"Binding criado: \$mac\"; :set macs (\$macs . \$mac . \";\") } } } }; :if ([:len \$macs] > 0) do={ :global pixMacsNotificar \$macs; :global pixAcaoNotificar \"connect\"; :log info \"Executando notificador...\"; /system script run notificador-pix } else={ :log info \"Nenhum MAC processado\" }; :log info \"PIX concluido\""
+
+# PASSO 2: Script de Limpeza (2 minutos)
+/system script add name="pix-limpeza" source=":log info \"=== LIMPEZA AUTOMATICA INICIADA ===\"; :local agora [/system clock get time]; :local hoje [/system clock get date]; :local h [:tonum [:pick \$agora 0 [:find \$agora \":\"]]]; :local m [:tonum [:pick \$agora 3 5]]; :local minAtual ((\$h * 60) + \$m); :local pos1 [:find \$hoje \"-\"]; :local anoAtual [:tonum [:pick \$hoje 0 \$pos1]]; :local resto1 [:pick \$hoje (\$pos1 + 1) [:len \$hoje]]; :local pos2 [:find \$resto1 \"-\"]; :local mesAtual [:tonum [:pick \$resto1 0 \$pos2]]; :local diaAtual [:tonum [:pick \$resto1 (\$pos2 + 1) [:len \$resto1]]]; :log info \"HOJE: \$anoAtual-\$mesAtual-\$diaAtual \$h:\$m\"; :local macsExpirados \"\"; :local removidos 0; :local total 0; :foreach binding in=[/ip hotspot ip-binding find where comment~\"PIX-EXPIRE-\"] do={ :set total (\$total + 1); :local comentario [/ip hotspot ip-binding get \$binding comment]; :local macAddress [/ip hotspot ip-binding get \$binding mac-address]; :local pos [:find \$comentario \"PIX-EXPIRE-\"]; :local dados [:pick \$comentario (\$pos + 11) [:len \$comentario]]; :local p1 [:find \$dados \"-\"]; :local ano [:tonum [:pick \$dados 0 \$p1]]; :local resto1 [:pick \$dados (\$p1 + 1) [:len \$dados]]; :local p2 [:find \$resto1 \"-\"]; :local mes [:tonum [:pick \$resto1 0 \$p2]]; :local resto2 [:pick \$resto1 (\$p2 + 1) [:len \$resto1]]; :local p3 [:find \$resto2 \"-\"]; :local dia [:tonum [:pick \$resto2 0 \$p3]]; :local resto3 [:pick \$resto2 (\$p3 + 1) [:len \$resto2]]; :local p4 [:find \$resto3 \"-\"]; :local horaStr [:pick \$resto3 0 \$p4]; :local horas [:tonum [:pick \$horaStr 0 2]]; :local mins [:tonum [:pick \$horaStr 2 4]]; :local minExpire ((\$horas * 60) + \$mins); :log info \"EXPIRE: \$ano-\$mes-\$dia \$horas:\$mins\"; :local expirou false; :local dataAtualNum ((\$anoAtual * 10000) + (\$mesAtual * 100) + \$diaAtual); :local dataExpireNum ((\$ano * 10000) + (\$mes * 100) + \$dia); :log info \"DataNum: atual=\$dataAtualNum vs expire=\$dataExpireNum\"; :if (\$dataExpireNum < \$dataAtualNum) do={ :set expirou true; :log info \"EXPIROU: Data passada (\$dataExpireNum < \$dataAtualNum)\" }; :if (\$dataExpireNum = \$dataAtualNum and \$minExpire <= \$minAtual) do={ :set expirou true; :log info \"EXPIROU: Mesmo dia, hora passada (\$minExpire <= \$minAtual)\" }; :if (\$expirou) do={ :log info \"REMOVENDO: \$macAddress\"; /ip hotspot ip-binding remove \$binding; :set macsExpirados (\$macsExpirados . \$macAddress . \";\"); :set removidos (\$removidos + 1) } else={ :log info \"MANTENDO: \$macAddress\" } }; :if ([:len \$macsExpirados] > 0) do={ :global pixMacsDesconectar \$macsExpirados; /system script run notificador-desconectado }; :log info \"=== TOTAL:\$total REMOVIDOS:\$removidos ===\""
+
+# PASSO 3: Script de Heartbeat (5 minutos)
+/system script add name="pix-heartbeat" source=":local url \"https://api.lucro.top/api/mikrotik/heartbeat\"; :local id \"78957cd3-7096-4acd-970b-0aa0a768c555\"; :local token \"mtk_241ca9a5_cb1f8255\"; :local version [/system resource get version]; :local uptime [/system resource get uptime]; :local json \"{\\\"mikrotik_id\\\":\\\"\\$id\\\",\\\"token\\\":\\\"\\$token\\\",\\\"version\\\":\\\"\\$version\\\",\\\"uptime\\\":\\\"\\$uptime\\\"}\"; :do { [/tool fetch url=\$url http-method=post http-header-field=\"Content-Type:application/json\" http-data=\$json] } on-error={}"
+
+# PASSO 4: Script Notificador PIX
+/system script add name="notificador-pix" source=":global pixMacsNotificar; :global pixAcaoNotificar; :log info \"=== NOTIFICADOR PIX INICIADO ===\"; :if ([:typeof \$pixMacsNotificar] = \"nothing\") do={ :log error \"Variável pixMacsNotificar não definida\"; return }; :if ([:typeof \$pixAcaoNotificar] = \"nothing\") do={ :log error \"Variável pixAcaoNotificar não definida\"; return }; :log info \"MACs para notificar: \$pixMacsNotificar\"; :log info \"Ação: \$pixAcaoNotificar\"; :local apiUrl \"https://api.lucro.top/api/mikrotik/auth-notification\"; :local mikrotikId \"78957cd3-7096-4acd-970b-0aa0a768c555\"; :local apiToken \"mtk_241ca9a5_cb1f8255\"; :local pos 0; :while ([:find \$pixMacsNotificar \";\" \$pos] >= 0) do={ :local fim [:find \$pixMacsNotificar \";\" \$pos]; :local mac [:pick \$pixMacsNotificar \$pos \$fim]; :if ([:len \$mac] > 0) do={ :log info \"Processando MAC: \$mac\"; :local jsonData \"{\\\"mikrotik_id\\\":\\\"\\$mikrotikId\\\",\\\"token\\\":\\\"\\$apiToken\\\",\\\"mac_address\\\":\\\"\\$mac\\\",\\\"action\\\":\\\"\\$pixAcaoNotificar\\\"}\"; :do { /tool fetch url=\$apiUrl http-method=post http-header-field=\"Content-Type:application/json\" http-data=\$jsonData keep-result=no; :log info \"Notificação enviada com sucesso para: \$mac\" } on-error={ :log error \"Erro ao enviar notificação para: \$mac - \$!\" } }; :set pos (\$fim + 1) }; :set pixMacsNotificar; :set pixAcaoNotificar; :log info \"=== NOTIFICADOR PIX FINALIZADO ===\""
+
+# PASSO 5: Script Notificador Desconectado
+/system script add name="notificador-desconectado" source=":global pixMacsDesconectar; :log info \"=== NOTIFICADOR DESCONEXAO INICIADO ===\"; :if ([:typeof \$pixMacsDesconectar] = \"nothing\") do={ :log error \"Variável pixMacsDesconectar não definida\"; return }; :log info \"MACs para desconectar: \$pixMacsDesconectar\"; :local apiUrl \"https://api.lucro.top/api/mikrotik/auth-notification\"; :local mikrotikId \"78957cd3-7096-4acd-970b-0aa0a768c555\"; :local apiToken \"mtk_241ca9a5_cb1f8255\"; :local pos 0; :while ([:find \$pixMacsDesconectar \";\" \$pos] >= 0) do={ :local fim [:find \$pixMacsDesconectar \";\" \$pos]; :local mac [:pick \$pixMacsDesconectar \$pos \$fim]; :if ([:len \$mac] > 0) do={ :log info \"Processando desconexão: \$mac\"; :local jsonData \"{\\\"mikrotik_id\\\":\\\"\\$mikrotikId\\\",\\\"token\\\":\\\"\\$apiToken\\\",\\\"mac_address\\\":\\\"\\$mac\\\",\\\"action\\\":\\\"disconnect\\\"}\"; :do { /tool fetch url=\$apiUrl http-method=post http-header-field=\"Content-Type:application/json\" http-data=\$jsonData keep-result=no; :log info \"Disconnect enviado com sucesso para: \$mac\" } on-error={ :log error \"Erro ao enviar disconnect para: \$mac - \$!\" } }; :set pos (\$fim + 1) }; :set pixMacsDesconectar; :log info \"=== NOTIFICADOR DESCONEXAO FINALIZADO ===\""
+
+# PASSO 6: Criar Schedulers (copie um por vez)
+/system scheduler add name="pix-verificador-scheduler" start-time=startup interval=40s on-event="/system script run pix-verificador"
+
+/system scheduler add name="pix-limpeza-scheduler" start-time=startup interval=2m on-event="/system script run pix-limpeza"
+
+/system scheduler add name="pix-heartbeat-scheduler" start-time=startup interval=5m on-event="/system script run pix-heartbeat"
+
+# PASSO 7: Testar instalação (copie um por vez)
+/system script run pix-heartbeat
+
+/system script run pix-verificador
+
+# PASSO 8: Verificar instalação
+/system script print
+
+/system scheduler print
+
+/log print where topics~"script"
+
+# ============================================================================
+# INSTALAÇÃO CONCLUÍDA!
+# Scripts criados: pix-verificador, pix-limpeza, pix-heartbeat, notificador-pix, notificador-desconectado
+# Schedulers: verificador (40s), limpeza (2min), heartbeat (5min)
+# ============================================================================ 
