@@ -1914,7 +1914,7 @@ app.post('/api/recent-sales', validarTokenMikrotik, async (req, res, next) => {
 
     if (!vendas || vendas.length === 0) {
       console.log('[RECENT-SALES] Nenhuma venda encontrada nas últimas 4 horas');
-      return res.send('');
+      return res.send('N/A');
     }
 
     // Filtrar apenas MACs que estão DESCONECTADOS
@@ -1933,7 +1933,7 @@ app.post('/api/recent-sales', validarTokenMikrotik, async (req, res, next) => {
 
     if (vendasDesconectadas.length === 0) {
       console.log('[RECENT-SALES] Todas as vendas são de MACs já conectados');
-      return res.send('');
+      return res.send('N/A');
     }
 
     // Formatar dados no formato solicitado: mac-minutos
