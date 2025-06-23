@@ -7,6 +7,23 @@ require('dotenv').config();
 const path = require('path');
 const fs = require('fs');
 
+// Configuração de timezone
+const TIMEZONE = process.env.TIMEZONE || 'America/Sao_Paulo';
+
+// Função utilitária para formatar data com timezone
+function formatDateWithTimezone(date = new Date()) {
+  return new Intl.DateTimeFormat('pt-BR', {
+    timeZone: TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).format(date);
+}
+
 // Valida├º├úo de vari├íveis de ambiente (apenas aviso, n├úo para execu├º├úo)
 const requiredEnvVars = [
   'SUPABASE_URL',
@@ -47,7 +64,7 @@ app.use(cors());
 
 // Middleware de log
 const logRequest = (req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`, {
+  console.log(`[${formatDateWithTimezone()}] ${req.method} ${req.path}`, {
     body: req.body,
     query: req.query
   });
@@ -100,6 +117,86 @@ async function handleSupabaseOperation(operation) {
       details: err.message,
       source: 'Supabase'
     };
+  }
+}
+
+// Middleware para validar token do MikroTik
+async function validarTokenMikrotik(req, res, next) {
+  try {
+    const { mikrotik_id, token } = req.body;
+    const mikrotikIdParam = req.params.mikrotik_id;
+    
+    // Usar mikrotik_id do body ou do parâmetro da URL
+    const finalMikrotikId = mikrotik_id || mikrotikIdParam;
+    
+    if (!finalMikrotikId) {
+      throw {
+        message: 'mikrotik_id obrigatório',
+        code: 'VALIDATION_ERROR',
+        details: 'O ID do Mikrotik é obrigatório',
+        source: 'API'
+      };
+    }
+
+    if (!token) {
+      throw {
+        message: 'Token obrigatório',
+        code: 'UNAUTHORIZED',
+        details: 'Token de autenticação é obrigatório',
+        source: 'API'
+      };
+    }
+
+    console.log(`[${formatDateWithTimezone()}] [AUTH] Validando token para MikroTik:`, finalMikrotikId);
+
+    // Verificar se o token corresponde ao MikroTik
+    const mikrotikValidacao = await handleSupabaseOperation(() =>
+      supabaseAdmin
+        .from('mikrotiks')
+        .select('id, nome, api_token, status')
+        .eq('id', finalMikrotikId)
+        .single()
+    );
+
+    if (!mikrotikValidacao) {
+      throw {
+        message: 'Mikrotik não encontrado',
+        code: 'NOT_FOUND',
+        details: `Mikrotik com ID ${finalMikrotikId} não foi encontrado`,
+        source: 'API'
+      };
+    }
+
+    // Verificar se o MikroTik está ativo
+    if (mikrotikValidacao.status !== 'Ativo') {
+      throw {
+        message: 'Mikrotik inativo',
+        code: 'FORBIDDEN',
+        details: 'Este MikroTik está inativo e não pode fazer requisições',
+        source: 'API'
+      };
+    }
+
+    // Verificar se o token bate
+    if (!mikrotikValidacao.api_token || mikrotikValidacao.api_token !== token) {
+      throw {
+        message: 'Token inválido',
+        code: 'UNAUTHORIZED',
+        details: 'Token não corresponde ao MikroTik informado',
+        source: 'API'
+      };
+    }
+
+    // Adicionar dados do MikroTik validado ao request
+    req.mikrotik = mikrotikValidacao;
+    req.mikrotik_id = finalMikrotikId;
+    
+    console.log(`[${formatDateWithTimezone()}] [AUTH] Token válido para:`, mikrotikValidacao.nome);
+    next();
+
+  } catch (err) {
+    console.error(`[${formatDateWithTimezone()}] [AUTH] Erro na validação:`, err);
+    next(err);
   }
 }
 
@@ -1557,20 +1654,11 @@ app.post('/api/webhook/mercadopago/test', async (req, res) => {
 });
 
 // Endpoint para listar MACs que compraram senhas nos últimos 5 minutos e estão DESCONECTADOS
-app.get('/api/recent-sales/:mikrotik_id', async (req, res, next) => {
+app.post('/api/recent-sales', validarTokenMikrotik, async (req, res, next) => {
   try {
-    const { mikrotik_id } = req.params;
+    const mikrotik_id = req.mikrotik_id; // Já validado pelo middleware
     
-    if (!mikrotik_id) {
-      throw {
-        message: 'mikrotik_id obrigatório',
-        code: 'VALIDATION_ERROR',
-        details: 'O ID do Mikrotik é obrigatório',
-        source: 'API'
-      };
-    }
-
-    console.log('[RECENT-SALES] Buscando vendas dos últimos 5 minutos para mikrotik:', mikrotik_id);
+    console.log(`[${formatDateWithTimezone()}] [RECENT-SALES] Buscando vendas dos últimos 5 minutos para mikrotik:`, req.mikrotik.nome);
 
     // Data dos últimos 5 minutos
     const agora = new Date();
@@ -1743,37 +1831,24 @@ function getAvailableTemplates() {
 }
 
 // Endpoint para receber notificações de autenticação do Mikrotik
-app.post('/api/mikrotik/auth-notification', async (req, res, next) => {
+app.post('/api/mikrotik/auth-notification', validarTokenMikrotik, async (req, res, next) => {
   try {
-    const { token, mac_address, mikrotik_id, action, usuario, ip_address } = req.body;
+    const { mac_address, action, usuario, ip_address } = req.body;
+    const mikrotik_id = req.mikrotik_id; // Já validado pelo middleware
     
-    console.log('[MIKROTIK AUTH] Notificação recebida:', { 
+    console.log(`[${formatDateWithTimezone()}] [MIKROTIK AUTH] Notificação recebida de ${req.mikrotik.nome}:`, { 
       mac_address, 
-      mikrotik_id, 
       action, 
       usuario, 
-      ip_address,
-      timestamp: new Date().toISOString()
+      ip_address
     });
 
-    // Token de segurança - deve ser configurado no .env
-    const expectedToken = process.env.MIKROTIK_AUTH_TOKEN || 'mikrotik-secure-token-2024';
-    
-    if (!token || token !== expectedToken) {
-      console.error('[MIKROTIK AUTH] Token inválido:', token);
-      return res.status(401).json({
-        error: 'Token de autorização inválido',
-        code: 'UNAUTHORIZED',
-        message: 'Token obrigatório e deve ser válido'
-      });
-    }
-
     // Validação de campos obrigatórios
-    if (!mac_address || !mikrotik_id || !action) {
+    if (!mac_address || !action) {
       throw {
         message: 'Campos obrigatórios ausentes',
         code: 'VALIDATION_ERROR',
-        details: 'mac_address, mikrotik_id e action são obrigatórios',
+        details: 'mac_address e action são obrigatórios',
         source: 'API'
       };
     }
@@ -1938,65 +2013,14 @@ app.get('/api/mikrotik/auth-notification/test', (req, res) => {
 // ENDPOINT HEARTBEAT - MONITORAMENTO MIKROTIKS
 // ==================================================
 
-app.post('/api/mikrotik/heartbeat', async (req, res, next) => {
+app.post('/api/mikrotik/heartbeat', validarTokenMikrotik, async (req, res, next) => {
   try {
-    console.log('[HEARTBEAT] Recebido heartbeat:', req.body);
-
-    const { mikrotik_id, token, version, uptime } = req.body;
-
-    // Validação básica
-    if (!mikrotik_id) {
-      throw {
-        message: 'mikrotik_id obrigatório',
-        code: 'VALIDATION_ERROR',
-        details: 'O ID do Mikrotik é obrigatório para heartbeat',
-        source: 'API'
-      };
-    }
-
-    // Validação do token com verificação no banco
-    if (!token) {
-      throw {
-        message: 'Token obrigatório',
-        code: 'VALIDATION_ERROR',
-        details: 'Token de heartbeat é obrigatório',
-        source: 'API'
-      };
-    }
-
-    console.log('[HEARTBEAT] Validando token para MikroTik:', mikrotik_id);
-
-    // Verificar se o token corresponde ao MikroTik
-    const mikrotikValidacao = await handleSupabaseOperation(() =>
-      supabaseAdmin
-        .from('mikrotiks')
-        .select('id, nome, api_token')
-        .eq('id', mikrotik_id)
-        .single()
-    );
-
-    if (!mikrotikValidacao) {
-      throw {
-        message: 'Mikrotik não encontrado',
-        code: 'NOT_FOUND',
-        details: `Mikrotik com ID ${mikrotik_id} não foi encontrado`,
-        source: 'API'
-      };
-    }
-
-    // Verificar se o token bate
-    if (mikrotikValidacao.api_token && mikrotikValidacao.api_token !== token) {
-      throw {
-        message: 'Token inválido',
-        code: 'UNAUTHORIZED',
-        details: 'Token não corresponde ao MikroTik informado',
-        source: 'API'
-      };
-    }
+    const { version, uptime } = req.body;
+    const mikrotik_id = req.mikrotik_id; // Já validado pelo middleware
+    
+    console.log(`[${formatDateWithTimezone()}] [HEARTBEAT] Recebido heartbeat de ${req.mikrotik.nome}:`, { version, uptime });
 
     const agora = new Date().toISOString();
-
-    console.log('[HEARTBEAT] Token válido. Atualizando último heartbeat para:', mikrotikValidacao.nome);
 
     // Atualizar último heartbeat do Mikrotik
     const mikrotikAtualizado = await handleSupabaseOperation(() =>
@@ -2012,7 +2036,7 @@ app.post('/api/mikrotik/heartbeat', async (req, res, next) => {
         .single()
     );
 
-    console.log('[HEARTBEAT] Heartbeat registrado com sucesso:', {
+    console.log(`[${formatDateWithTimezone()}] [HEARTBEAT] Heartbeat registrado com sucesso:`, {
       mikrotik_id: mikrotikAtualizado.id,
       nome: mikrotikAtualizado.nome,
       ultimo_heartbeat: mikrotikAtualizado.ultimo_heartbeat,
