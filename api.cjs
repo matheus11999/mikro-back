@@ -60,11 +60,25 @@ const supabaseAdmin = createClient(
 // Função para verificar pagamentos pendentes no startup
 async function verificarPagamentosPendentesStartup() {
   try {
+    // Verifica se as variáveis de ambiente estão configuradas
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.log('⚠️  Variáveis do Supabase não configuradas - pulando verificação de pagamentos pendentes');
+      return;
+    }
+    
+    if (!process.env.MERCADO_PAGO_ACCESS_TOKEN) {
+      console.log('⚠️  Token do Mercado Pago não configurado - pulando verificação de pagamentos pendentes');
+      return;
+    }
+    
     console.log('\n🔍 VERIFICANDO PAGAMENTOS PENDENTES NO STARTUP...');
     console.log('='.repeat(60));
     
-    // Buscar vendas com status pendente, processando, autorizado ou criado
+    // Buscar vendas com status pendente, processando, autorizado ou criado das últimas 4 horas
     const statusPendentes = ['pendente', 'processando', 'autorizado', 'criado'];
+    const quatroHorasAtras = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(); // 4 horas atrás
+    
+    console.log(`📅 Buscando vendas pendentes desde: ${quatroHorasAtras}`);
     
     const vendasPendentes = await handleSupabaseOperation(() =>
       supabaseAdmin
@@ -72,7 +86,8 @@ async function verificarPagamentosPendentesStartup() {
         .select('*, mac_id(*), plano_id(*), mikrotik_id(*)')
         .in('status', statusPendentes)
         .not('payment_id', 'is', null)
-        .order('criado_em', { ascending: false })
+        .gte('created_at', quatroHorasAtras)
+        .order('created_at', { ascending: false })
         .limit(50) // Limita a 50 para não sobrecarregar
     );
 
@@ -1815,7 +1830,7 @@ app.post('/api/webhook/mercadopago', async (req, res, next) => {
             }, 10000);
           }
         }
-      }, 2000); // Aguarda 2 segundos antes de processar
+              }, 2000); // Aguarda 2 segundos antes de processar
     } else {
       console.log('[WEBHOOK MP] Notificação ignorada:', { topic: paymentTopic, id: paymentId });
     }
