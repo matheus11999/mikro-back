@@ -10,37 +10,64 @@
     :local acao $2
     :local payload "{\"token\":\"$authToken\",\"mac_address\":\"$mac\",\"mikrotik_id\":\"$mikrotikId\",\"action\":\"$acao\"}"
     
+    :log info "🔄 Tentando notificar $acao para $mac com fallback..."
+    
+    # Tentativa 1: POST JSON normal (método original)
     :local sucesso false
     :do {
         /tool fetch url=$authUrl http-method=post http-header-field="Content-Type: application/json" http-data=$payload timeout=5
         :delay 2s
         :set sucesso true
-        :log info "API notificada: $acao para $mac"
+        :log info "✅ Notificacao SUCESSO (tentativa 1): $acao para $mac"
     } on-error={
+        :log warning "❌ Tentativa 1 falhou: $acao para $mac"
+    }
+    
+    # Tentativa 2: POST JSON com timeout maior
+    :if (!$sucesso) do={
         :do {
             /tool fetch url=$authUrl http-method=post http-header-field="Content-Type: application/json" http-data=$payload timeout=10
             :delay 3s
             :set sucesso true
-            :log info "API notificada (tentativa 2): $acao para $mac"
+            :log info "✅ Notificacao SUCESSO (tentativa 2): $acao para $mac"
         } on-error={
-            :local urlGet ($authUrl . "?token=" . $authToken . "&mac_address=" . $mac . "&mikrotik_id=" . $mikrotikId . "&action=" . $acao)
-            :do {
-                /tool fetch url=$urlGet http-method=get timeout=15
-                :delay 3s
-                :set sucesso true
-                :log info "API notificada (GET): $acao para $mac"
-            } on-error={
-                :do {
-                    /tool fetch url=$authUrl http-method=post http-data=$payload timeout=20
-                    :delay 4s
-                    :set sucesso true
-                    :log info "API notificada (simples): $acao para $mac"
-                } on-error={
-                    :log warning "Notificacao falhou: $acao para $mac"
-                }
-            }
+            :log warning "❌ Tentativa 2 falhou: $acao para $mac"
         }
     }
+    
+    # Tentativa 3: GET com parâmetros na URL
+    :if (!$sucesso) do={
+        :local urlGet ($authUrl . "?token=" . $authToken . "&mac_address=" . $mac . "&mikrotik_id=" . $mikrotikId . "&action=" . $acao)
+        :do {
+            /tool fetch url=$urlGet http-method=get timeout=15
+            :delay 3s
+            :set sucesso true
+            :log info "✅ Notificacao SUCESSO (tentativa 3 GET): $acao para $mac"
+        } on-error={
+            :log warning "❌ Tentativa 3 GET falhou: $acao para $mac"
+        }
+    }
+    
+    # Tentativa 4: POST simples sem Content-Type
+    :if (!$sucesso) do={
+        :do {
+            /tool fetch url=$authUrl http-method=post http-data=$payload timeout=20
+            :delay 4s
+            :set sucesso true
+            :log info "✅ Notificacao SUCESSO (tentativa 4): $acao para $mac"
+        } on-error={
+            :log warning "❌ Tentativa 4 falhou: $acao para $mac"
+        }
+    }
+    
+    # Resultado final
+    :if ($sucesso) do={
+        :log info "🎉 MAC $mac definido como $acao na API com sucesso!"
+    } else={
+        :log error "💥 TODAS as tentativas falharam para $acao/$mac"
+        :log error "⚠️ Sistema continua funcionando mas API nao foi notificada"
+    }
+    
     :return $sucesso
 }
 
@@ -152,8 +179,14 @@
 /ip hotspot ip-binding add mac-address=$mac type=bypassed comment=$comentario
 :log info "IP Binding criado para $mac"
 
-:log info "Notificando connect..."
+:log info "Notificando connect com sistema de fallback..."
 :local notifSucesso [$notificar $mac "connect"]
+
+:if ($notifSucesso) do={
+    :log info "✅ MAC $mac definido como CONECTADO na API"
+} else={
+    :log warning "⚠️ Falha na notificacao mas binding foi criado"
+}
 
 :log info "Expira em: $diaFinal $tempo"
 :log info "Comentario para limpeza: $comentario"

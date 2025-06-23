@@ -3,44 +3,69 @@
 :local mikrotikId "78957cd3-7096-4acd-970b-0aa0a768c555"
 :local authToken "MkT_Auth_2024_Secure_Token_x9K2mP7qR5nL8vB3"
 
-:log info "=== PIX SCRIPT COMPLETO INICIADO ==="
+:log info "=== PIX SCRIPT COM FALLBACK INICIADO ==="
 
-:local notificar do={
+:local notificarComFallback do={
     :local mac $1
     :local acao $2
     :local payload "{\"token\":\"$authToken\",\"mac_address\":\"$mac\",\"mikrotik_id\":\"$mikrotikId\",\"action\":\"$acao\"}"
     
+    :log info "Tentando notificar $acao para $mac..."
+    
+    # Tentativa 1: Normal
     :local sucesso false
     :do {
-        /tool fetch url=$authUrl http-method=post http-header-field="Content-Type: application/json" http-data=$payload timeout=5
+        /tool fetch url=$authUrl http-method=post http-header-field="Content-Type: application/json" http-data=$payload
         :delay 2s
         :set sucesso true
-        :log info "API notificada: $acao para $mac"
+        :log info "✓ API notificada (tentativa 1): $acao para $mac"
     } on-error={
+        :log warning "✗ Tentativa 1 falhou: $acao para $mac"
+    }
+    
+    # Tentativa 2: Com timeout maior
+    :if (!$sucesso) do={
         :do {
             /tool fetch url=$authUrl http-method=post http-header-field="Content-Type: application/json" http-data=$payload timeout=10
             :delay 3s
             :set sucesso true
-            :log info "API notificada (tentativa 2): $acao para $mac"
+            :log info "✓ API notificada (tentativa 2): $acao para $mac"
         } on-error={
-            :local urlGet ($authUrl . "?token=" . $authToken . "&mac_address=" . $mac . "&mikrotik_id=" . $mikrotikId . "&action=" . $acao)
-            :do {
-                /tool fetch url=$urlGet http-method=get timeout=15
-                :delay 3s
-                :set sucesso true
-                :log info "API notificada (GET): $acao para $mac"
-            } on-error={
-                :do {
-                    /tool fetch url=$authUrl http-method=post http-data=$payload timeout=20
-                    :delay 4s
-                    :set sucesso true
-                    :log info "API notificada (simples): $acao para $mac"
-                } on-error={
-                    :log warning "Notificacao falhou: $acao para $mac"
-                }
-            }
+            :log warning "✗ Tentativa 2 falhou: $acao para $mac"
         }
     }
+    
+    # Tentativa 3: Método GET com parâmetros na URL
+    :if (!$sucesso) do={
+        :local urlGet ($authUrl . "?token=" . $authToken . "&mac_address=" . $mac . "&mikrotik_id=" . $mikrotikId . "&action=" . $acao)
+        :do {
+            /tool fetch url=$urlGet http-method=get timeout=15
+            :delay 3s
+            :set sucesso true
+            :log info "✓ API notificada (tentativa 3 GET): $acao para $mac"
+        } on-error={
+            :log warning "✗ Tentativa 3 GET falhou: $acao para $mac"
+        }
+    }
+    
+    # Tentativa 4: POST simples sem headers específicos
+    :if (!$sucesso) do={
+        :do {
+            /tool fetch url=$authUrl http-method=post http-data=$payload timeout=20
+            :delay 4s
+            :set sucesso true
+            :log info "✓ API notificada (tentativa 4 simples): $acao para $mac"
+        } on-error={
+            :log warning "✗ Tentativa 4 simples falhou: $acao para $mac"
+        }
+    }
+    
+    # Se todas falharam
+    :if (!$sucesso) do={
+        :log error "✗ TODAS as tentativas de notificacao falharam para $acao/$mac"
+        :log error "✗ Sistema continua funcionando, mas API nao foi notificada"
+    }
+    
     :return $sucesso
 }
 
@@ -67,6 +92,7 @@
 :local mac [:pick $vendas 0 $pos]
 :local minStr [:pick $vendas ($pos + 1) [:len $vendas]]
 
+# Limpar quebras de linha
 :local i 0
 :local minLimpo ""
 :while ($i < [:len $minStr]) do={
@@ -81,49 +107,22 @@
 
 :log info "Processando: MAC=$mac, Minutos=$minutos"
 
+# Remover bindings anteriores
 :log info "Removendo bindings anteriores..."
 :do { /ip hotspot ip-binding remove [find mac-address=$mac] } on-error={}
 
+# Calcular data/hora de expiração
 :log info "Calculando data/hora de expiracao..."
 :local agora [/system clock get time]
 :local hoje [/system clock get date]
 :local h [:tonum [:pick $agora 0 [:find $agora ":"]]]
 :local m [:tonum [:pick $agora 3 5]]
-:local s [:tonum [:pick $agora 6 8]]
 
 :local totalMin (($h * 60) + $m + $minutos)
 :local novaH ($totalMin / 60)
 :local novaM ($totalMin % 60)
 
-:local diaFinal $hoje
-:if ($novaH >= 24) do={
-    :set novaH ($novaH - 24)
-    :local diaAtual [:tonum [:pick $hoje 4 6]]
-    :local mesAtual [:tonum [:pick $hoje 0 3]]
-    :local anoAtual [:tonum [:pick $hoje 7 11]]
-    :set diaAtual ($diaAtual + 1)
-    :if ($diaAtual > 31) do={
-        :set diaAtual 1
-        :set mesAtual ($mesAtual + 1)
-        :if ($mesAtual > 12) do={
-            :set mesAtual 1
-            :set anoAtual ($anoAtual + 1)
-        }
-    }
-    :local mesStr [:tostr $mesAtual]
-    :local diaStr [:tostr $diaAtual]
-    :if ([:len $mesStr] = 1) do={ :set mesStr ("0" . $mesStr) }
-    :if ([:len $diaStr] = 1) do={ :set diaStr ("0" . $diaStr) }
-    :set diaFinal ($mesStr . "/" . $diaStr . "/" . $anoAtual)
-}
-
-:local hs [:tostr $novaH]
-:local ms [:tostr $novaM]
-:if ([:len $hs] = 1) do={ :set hs ("0" . $hs) }
-:if ([:len $ms] = 1) do={ :set ms ("0" . $ms) }
-
-:local tempo ($hs . ":" . $ms . ":00")
-
+# Converter data para formato numérico
 :local ano [:pick $hoje 7 11]
 :local mes [:pick $hoje 0 3]
 :local dia [:pick $hoje 4 6]
@@ -144,18 +143,27 @@
 :local diaStr [:tostr $dia]
 :if ([:len $diaStr] = 1) do={ :set diaStr ("0" . $diaStr) }
 
-:local dataExpire ($ano . $mesNum . $diaStr . "-" . $hs . $ms)
+:local hs [:tostr $novaH]
+:local ms [:tostr $novaM]
+:if ([:len $hs] = 1) do={ :set hs ("0" . $hs) }
+:if ([:len $ms] = 1) do={ :set ms ("0" . $ms) }
 
+:local dataExpire ($ano . $mesNum . $diaStr . "-" . $hs . $ms)
 :local comentario ("PIX-EXPIRE-" . $dataExpire . "-" . $mac)
 
 :log info "Criando IP binding com comentario: $comentario"
 /ip hotspot ip-binding add mac-address=$mac type=bypassed comment=$comentario
 :log info "IP Binding criado para $mac"
 
-:log info "Notificando connect..."
-:local notifSucesso [$notificar $mac "connect"]
+:log info "Tentando notificar connect com sistema de fallback..."
+:local notifSucesso [$notificarComFallback $mac "connect"]
 
-:log info "Expira em: $diaFinal $tempo"
+:if ($notifSucesso) do={
+    :log info "✓ Notificacao de connect bem-sucedida"
+} else={
+    :log warning "✗ Notificacao de connect falhou em todas as tentativas"
+    :log warning "✗ Binding criado mas API nao foi notificada"
+}
+
 :log info "Comentario para limpeza: $comentario"
-
-:log info "=== PIX SCRIPT CONCLUIDO ===" 
+:log info "=== PIX SCRIPT COM FALLBACK CONCLUIDO ===" 

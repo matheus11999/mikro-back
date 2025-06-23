@@ -12,35 +12,22 @@
     
     :local sucesso false
     :do {
-        /tool fetch url=$authUrl http-method=post http-header-field="Content-Type: application/json" http-data=$payload timeout=5
-        :delay 2s
+        /tool fetch url=$authUrl http-method=post http-header-field="Content-Type: application/json" http-data=$payload timeout=8
+        :delay 3s
         :set sucesso true
         :log info "API notificada: $acao para $mac"
     } on-error={
+        :delay 2s
         :do {
-            /tool fetch url=$authUrl http-method=post http-header-field="Content-Type: application/json" http-data=$payload timeout=10
+            /tool fetch url=$authUrl http-method=post http-header-field="Content-Type: application/json" http-data=$payload timeout=12
             :delay 3s
             :set sucesso true
-            :log info "API notificada (tentativa 2): $acao para $mac"
+            :log info "API notificada (2a tentativa): $acao para $mac"
         } on-error={
-            :local urlGet ($authUrl . "?token=" . $authToken . "&mac_address=" . $mac . "&mikrotik_id=" . $mikrotikId . "&action=" . $acao)
-            :do {
-                /tool fetch url=$urlGet http-method=get timeout=15
-                :delay 3s
-                :set sucesso true
-                :log info "API notificada (GET): $acao para $mac"
-            } on-error={
-                :do {
-                    /tool fetch url=$authUrl http-method=post http-data=$payload timeout=20
-                    :delay 4s
-                    :set sucesso true
-                    :log info "API notificada (simples): $acao para $mac"
-                } on-error={
-                    :log warning "Notificacao falhou: $acao para $mac"
-                }
-            }
+            :log warning "Notificacao falhou: $acao para $mac"
         }
     }
+    
     :return $sucesso
 }
 
@@ -153,7 +140,13 @@
 :log info "IP Binding criado para $mac"
 
 :log info "Notificando connect..."
-:local notifSucesso [$notificar $mac "connect"]
+:local notifOk [$notificar $mac "connect"]
+
+:if ($notifOk) do={
+    :log info "MAC $mac definido como CONECTADO na API"
+} else={
+    :log warning "Falha na notificacao mas binding criado"
+}
 
 :log info "Expira em: $diaFinal $tempo"
 :log info "Comentario para limpeza: $comentario"

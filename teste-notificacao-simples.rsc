@@ -1,0 +1,1 @@
+/tool fetch url="https://api.lucro.top/api/mikrotik/auth-notification" http-method=post http-header-field="Content-Type: application/json" http-data="{\"token\":\"MkT_Auth_2024_Secure_Token_x9K2mP7qR5nL8vB3\",\"mac_address\":\"AA:BB:CC:DD:EE:99\",\"mikrotik_id\":\"78957cd3-7096-4acd-970b-0aa0a768c555\",\"action\":\"connect\"}" 
