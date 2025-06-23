@@ -1954,19 +1954,49 @@ app.post('/api/mikrotik/heartbeat', async (req, res, next) => {
       };
     }
 
-    // Validação do token (básica)
-    if (!token || token.length < 10) {
+    // Validação do token com verificação no banco
+    if (!token) {
       throw {
-        message: 'Token inválido',
+        message: 'Token obrigatório',
         code: 'VALIDATION_ERROR',
         details: 'Token de heartbeat é obrigatório',
         source: 'API'
       };
     }
 
+    console.log('[HEARTBEAT] Validando token para MikroTik:', mikrotik_id);
+
+    // Verificar se o token corresponde ao MikroTik
+    const mikrotikValidacao = await handleSupabaseOperation(() =>
+      supabaseAdmin
+        .from('mikrotiks')
+        .select('id, nome, api_token')
+        .eq('id', mikrotik_id)
+        .single()
+    );
+
+    if (!mikrotikValidacao) {
+      throw {
+        message: 'Mikrotik não encontrado',
+        code: 'NOT_FOUND',
+        details: `Mikrotik com ID ${mikrotik_id} não foi encontrado`,
+        source: 'API'
+      };
+    }
+
+    // Verificar se o token bate
+    if (mikrotikValidacao.api_token && mikrotikValidacao.api_token !== token) {
+      throw {
+        message: 'Token inválido',
+        code: 'UNAUTHORIZED',
+        details: 'Token não corresponde ao MikroTik informado',
+        source: 'API'
+      };
+    }
+
     const agora = new Date().toISOString();
 
-    console.log('[HEARTBEAT] Atualizando último heartbeat para Mikrotik:', mikrotik_id);
+    console.log('[HEARTBEAT] Token válido. Atualizando último heartbeat para:', mikrotikValidacao.nome);
 
     // Atualizar último heartbeat do Mikrotik
     const mikrotikAtualizado = await handleSupabaseOperation(() =>
@@ -1981,15 +2011,6 @@ app.post('/api/mikrotik/heartbeat', async (req, res, next) => {
         .select('id, nome, ultimo_heartbeat, heartbeat_version, heartbeat_uptime')
         .single()
     );
-
-    if (!mikrotikAtualizado) {
-      throw {
-        message: 'Mikrotik não encontrado',
-        code: 'NOT_FOUND',
-        details: `Mikrotik com ID ${mikrotik_id} não foi encontrado`,
-        source: 'API'
-      };
-    }
 
     console.log('[HEARTBEAT] Heartbeat registrado com sucesso:', {
       mikrotik_id: mikrotikAtualizado.id,
@@ -2014,6 +2035,89 @@ app.post('/api/mikrotik/heartbeat', async (req, res, next) => {
 
   } catch (err) {
     console.error('[HEARTBEAT] Erro ao processar heartbeat:', err);
+    next(err);
+  }
+});
+
+// ==================================================
+// ENDPOINTS ADMINISTRATIVOS PARA TOKENS
+// ==================================================
+
+// Endpoint para regenerar token de um MikroTik (apenas admins)
+app.post('/api/admin/mikrotik/:id/regenerate-token', async (req, res, next) => {
+  try {
+    const mikrotik_id = req.params.id;
+    
+    console.log('[ADMIN] Regenerando token para MikroTik:', mikrotik_id);
+
+    // Gerar novo token único
+    const novoToken = 'mtk_' + Math.random().toString(36).substring(2, 10) + '_' + Math.random().toString(36).substring(2, 10);
+
+    // Atualizar token no banco
+    const mikrotikAtualizado = await handleSupabaseOperation(() =>
+      supabaseAdmin
+        .from('mikrotiks')
+        .update({ api_token: novoToken })
+        .eq('id', mikrotik_id)
+        .select('id, nome, api_token')
+        .single()
+    );
+
+    if (!mikrotikAtualizado) {
+      throw {
+        message: 'MikroTik não encontrado',
+        code: 'NOT_FOUND',
+        details: `MikroTik com ID ${mikrotik_id} não foi encontrado`,
+        source: 'API'
+      };
+    }
+
+    console.log('[ADMIN] Token regenerado com sucesso para MikroTik:', mikrotikAtualizado.nome);
+
+    res.json({
+      success: true,
+      message: 'Token regenerado com sucesso',
+      data: {
+        mikrotik_id: mikrotikAtualizado.id,
+        novo_token: mikrotikAtualizado.api_token
+      }
+    });
+
+  } catch (err) {
+    console.error('[ADMIN] Erro ao regenerar token:', err);
+    next(err);
+  }
+});
+
+// Endpoint para listar MikroTiks com tokens (apenas para admins)
+app.get('/api/admin/mikrotiks', async (req, res, next) => {
+  try {
+    const { show_tokens } = req.query;
+    
+    console.log('[ADMIN] Listando MikroTiks. Mostrar tokens:', show_tokens === 'true');
+
+    let selectFields = 'id, nome, provider_name, status, cliente_id, criado_em, profitpercentage, ultimo_heartbeat, heartbeat_version, heartbeat_uptime';
+    
+    // Incluir token se solicitado
+    if (show_tokens === 'true') {
+      selectFields += ', api_token';
+    }
+
+    const mikrotiks = await handleSupabaseOperation(() =>
+      supabaseAdmin
+        .from('mikrotiks')
+        .select(selectFields)
+        .order('nome')
+    );
+
+    res.json({
+      success: true,
+      data: mikrotiks,
+      total: mikrotiks.length
+    });
+
+  } catch (err) {
+    console.error('[ADMIN] Erro ao listar MikroTiks:', err);
     next(err);
   }
 });
