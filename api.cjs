@@ -1096,7 +1096,7 @@ app.post('/api/captive-check/pix', async (req, res, next) => {
       transaction_amount: precoNumerico,
       description: descricao || plano.nome,
       payment_method_id: 'pix',
-      notification_url: 'https://api.lucro.top/api/webhook/mercadopago', // WEBHOOK URL AQUI!
+      notification_url: `${process.env.API_DOMAIN || 'https://api.lucro.top'}/api/webhook/mercadopago`, // WEBHOOK URL DINÂMICO!
       payer: payer || {
         email: 'comprador@email.com',
         first_name: 'Joao',
@@ -1872,7 +1872,8 @@ app.post('/api/webhook/mercadopago/test', async (req, res) => {
   
   // Envia para o webhook real
   try {
-    const response = await fetch('http://localhost:3000/api/webhook/mercadopago', {
+    const webhookUrl = `${process.env.API_DOMAIN || 'http://localhost:3000'}/api/webhook/mercadopago`;
+    const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(simulatedNotification)
@@ -2640,13 +2641,18 @@ app.use('*', (req, res) => {
 // Porta
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
+  const apiDomain = process.env.API_DOMAIN || 'https://api.lucro.top';
+  
   console.log('='.repeat(50));
   console.log(`🚀 PIX MIKRO API - Servidor iniciado`);
-  console.log(`📡 API disponível em: http://localhost:${port}/`);
-  console.log(`🏥 Health check: http://localhost:${port}/health`);
+  console.log(`📡 API local: http://localhost:${port}/`);
+  console.log(`🌐 Domínio público: ${apiDomain}`);
+  console.log(`🏥 Health check: ${apiDomain}/health`);
+  console.log(`📞 Webhook URL: ${apiDomain}/api/webhook/mercadopago`);
   console.log(`🔒 Middleware de segurança ativo`);
   console.log(`💳 Webhook Mercado Pago configurado`);
   console.log(`💓 Sistema de heartbeat MikroTik ativo`);
+  console.log(`⚡ Sistema de tempo restante automático ativo`);
   console.log('='.repeat(50));
   
   // Aguarda 3 segundos e então verifica pagamentos pendentes e MACs expirados
