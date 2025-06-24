@@ -1,0 +1,9 @@
+# Variáveis de Ambiente para API Local
+# Renomeie para .env e configure os valores reais
+
+SUPABASE_URL=https://seu-projeto.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=sua-service-role-key
+MERCADO_PAGO_ACCESS_TOKEN=seu-token-mercado-pago
+TIMEZONE=America/Sao_Paulo
+API_DOMAIN=http://localhost:3000
+PORT=3000 
