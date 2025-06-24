@@ -2191,8 +2191,25 @@ app.post('/api/mikrotik/auth-notification', validarTokenMikrotik, async (req, re
     let tempoRestante = 0;
     let planoExpirado = false;
 
-    if (macObj.vendas && macObj.vendas.length > 0) {
-      // Pegar a venda mais recente aprovada
+    // Se MAC já está desconectado ou sendo desconectado, resetar lógica de tempo
+    const acaoDesconexao = ['logout', 'disconnect', 'disconnected'].includes(action.toLowerCase());
+    const macJaDesconectado = macObj.status === 'desconectado';
+
+    if (acaoDesconexao || macJaDesconectado) {
+      console.log(`[MIKROTIK AUTH] MAC sendo desconectado ou já desconectado - resetando tempo:`, {
+        mac: mac_address,
+        action,
+        statusAtual: macObj.status,
+        acaoDesconexao,
+        macJaDesconectado
+      });
+      
+      // Para ações de desconexão, não calcular tempo restante
+      planoAtual = null;
+      tempoRestante = 0;
+      planoExpirado = false;
+    } else if (macObj.vendas && macObj.vendas.length > 0) {
+      // Só calcular tempo para ações de conexão/login
       const ultimaVendaAprovada = macObj.vendas
         .filter(v => v.status === 'aprovado' && v.pagamento_aprovado_em)
         .sort((a, b) => new Date(b.pagamento_aprovado_em) - new Date(a.pagamento_aprovado_em))[0];
