@@ -2341,7 +2341,7 @@ app.listen(port, () => {
   
   // Roda as verificações iniciais em background, sem bloquear o startup.
   // Isso garante que o servidor responda rapidamente aos "health checks".
-  verificarPagamentosPendentesStartup();
+  // verificarPagamentosPendentesStartup(); // Função não definida - comentada
   verificarMacsExpirados();
 }); 
 
