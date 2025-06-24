@@ -2416,6 +2416,58 @@ app.get('/api/admin/mikrotiks', async (req, res, next) => {
   }
 });
 
+// Endpoint para verificar MACs conectados e retornar lista para comparar com IP bindings
+app.post('/api/mikrotik/conectados', validarTokenMikrotik, async (req, res, next) => {
+  try {
+    const mikrotik_id = req.mikrotik_id; // Já validado pelo middleware
+    const mikrotikNome = req.mikrotik.nome;
+    
+    console.log(`[${formatDateWithTimezone()}] [CONECTADOS] Consultando MACs conectados para:`, mikrotikNome);
+
+    // Buscar MACs marcados como "conectado" no banco para este MikroTik
+    const macsConectados = await handleSupabaseOperation(() =>
+      supabaseAdmin
+        .from('macs')
+        .select('id, mac_address, status, ultimo_acesso, ultimo_plano, total_compras')
+        .eq('mikrotik_id', mikrotik_id)
+        .eq('status', 'conectado')
+        .order('ultimo_acesso', { ascending: false })
+    );
+
+    console.log(`[CONECTADOS] Encontrados ${macsConectados.length} MACs conectados no banco para ${mikrotikNome}`);
+
+    // Preparar lista de MACs para retorno
+    const macsLista = macsConectados.map(mac => ({
+      mac_address: mac.mac_address,
+      ultimo_acesso: mac.ultimo_acesso,
+      ultimo_plano: mac.ultimo_plano || 'N/A',
+      total_compras: mac.total_compras || 0
+    }));
+
+    // Criar string de MACs separados por ; para uso no script MikroTik
+    const macsString = macsConectados.map(mac => mac.mac_address).join(';');
+
+    res.json({
+      success: true,
+      mikrotik: {
+        id: mikrotik_id,
+        nome: mikrotikNome
+      },
+      total_conectados: macsConectados.length,
+      macs_lista: macsLista,
+      macs_string: macsString, // Para usar no script MikroTik
+      timestamp: new Date().toISOString(),
+      message: macsConectados.length > 0 
+        ? `${macsConectados.length} MACs conectados encontrados` 
+        : 'Nenhum MAC conectado no banco'
+    });
+
+  } catch (err) {
+    console.error(`[${formatDateWithTimezone()}] [CONECTADOS] Erro na consulta:`, err);
+    next(err);
+  }
+});
+
 // Endpoint para verificar status de MikroTiks online/offline
 app.get('/api/mikrotik/status', async (req, res, next) => {
   try {
