@@ -84,8 +84,8 @@ async function processarAprovacaoPagamento(venda, mpData) {
 
     const porcentagemAdmin = Math.max(0, Math.min(100, parseFloat(mikrotikInfo?.profitpercentage) || 10));
     const valorTotal = venda.valor || venda.preco; // Mantém compatibilidade com a coluna 'preco' se 'valor' não existir.
-    const valorCreditadoCliente = Number((valorTotal * ((100 - porcentagemAdmin) / 100)).toFixed(3)); // Cliente recebe o que sobra após a comissão do admin
-    const comissaoAdmin = valorTotal - valorCreditadoCliente; // Admin recebe a diferença
+    const valorCreditadoCliente = truncar3Decimais(valorTotal * ((100 - porcentagemAdmin) / 100)); // Cliente recebe o que sobra após a comissão do admin
+    const comissaoAdmin = truncar3Decimais(valorTotal - valorCreditadoCliente); // Admin recebe a diferença
 
     // 1. Incrementar saldos
     await supabaseAdmin.rpc('incrementar_saldo_admin', { valor: comissaoAdmin });
@@ -120,7 +120,7 @@ async function processarAprovacaoPagamento(venda, mpData) {
     // 5. Atualizar a tabela de MACs
     await handleSupabaseOperation(() =>
         supabaseAdmin.from('macs').update({
-            total_gasto: (venda.mac_id.total_gasto || 0) + Number(valorTotal),
+            total_gasto: (venda.mac_id.total_gasto || 0) + truncar3Decimais(valorTotal),
             total_compras: (venda.mac_id.total_compras || 0) + 1,
             ultimo_plano: planoInfo?.nome,
             ultimo_valor: valorTotal,
@@ -152,7 +152,7 @@ async function processarOutrosStatus(venda, mpData) {
             // Usa os valores históricos que foram salvos para garantir a reversão correta
             const valorTotalVenda = venda.plano_preco || venda.valor;
             const valorClienteReverter = venda.valor_creditado_cliente || 0;
-            const valorAdminReverter = valorTotalVenda - valorClienteReverter;
+            const valorAdminReverter = truncar3Decimais(valorTotalVenda - valorClienteReverter);
 
             if (valorAdminReverter > 0) {
               await handleSupabaseOperation(() => supabaseAdmin.rpc('incrementar_saldo_admin', { valor: -valorAdminReverter }));
@@ -610,7 +610,7 @@ app.post('/api/captive-check/status', async (req, res, next) => {
     }
     // Estat├ísticas do MAC
     const totalVendas = vendasAprovadas ? vendasAprovadas.length : 0;
-    const totalGasto = vendasAprovadas ? vendasAprovadas.reduce((acc, v) => acc + Number(v.preco || 0), 0) : 0;
+    const totalGasto = vendasAprovadas ? vendasAprovadas.reduce((acc, v) => acc + truncar3Decimais(Number(v.preco || 0)), 0) : 0;
     const ultimoValor = vendasAprovadas && vendasAprovadas[0] ? vendasAprovadas[0].preco : null;
     const ultimoPlano = vendasAprovadas && vendasAprovadas[0] ? vendasAprovadas[0].plano_id?.nome || '' : null;
     // Se houver venda pendente, verifica status no Mercado Pago
@@ -679,12 +679,12 @@ app.post('/api/captive-check/status', async (req, res, next) => {
                   .single()
               );
               
-              let porcentagemAdmin = parseFloat(mikrotikInfo?.profitpercentage) || 10;
+              let porcentagemAdmin = truncar3Decimais(mikrotikInfo?.profitpercentage) || 10;
               if (porcentagemAdmin > 100) porcentagemAdmin = 100;
               if (porcentagemAdmin < 0) porcentagemAdmin = 0;
               
-              const comissaoAdmin = vendaPendente.preco * (porcentagemAdmin / 100);
-              const comissaoDono = vendaPendente.preco - comissaoAdmin;
+              const comissaoAdmin = truncar3Decimais(vendaPendente.preco * (porcentagemAdmin / 100));
+              const comissaoDono = truncar3Decimais(vendaPendente.preco - comissaoAdmin);
               
               // Atualiza saldo do admin
               await supabaseAdmin.rpc('incrementar_saldo_admin', { valor: comissaoAdmin });
@@ -705,8 +705,8 @@ app.post('/api/captive-check/status', async (req, res, next) => {
                     status: 'aprovado',
                     pagamento_aprovado_em: pagamentoAprovadoEm,
                     senha_id: senha.id,
-                    lucro: comissaoAdmin,
-                    valor: comissaoDono
+                    lucro: truncar3Decimais(comissaoAdmin),
+                    valor: truncar3Decimais(comissaoDono)
                   })
                   .eq('id', vendaPendente.id)
               );
@@ -725,7 +725,7 @@ app.post('/api/captive-check/status', async (req, res, next) => {
                 supabaseAdmin
                   .from('macs')
                   .update({
-                    total_gasto: (macObj.total_gasto || 0) + Number(vendaPendente.preco || 0),
+                    total_gasto: (macObj.total_gasto || 0) + truncar3Decimais(vendaPendente.preco || 0),
                     total_compras: (macObj.total_compras || 0) + 1,
                     ultimo_plano: planoInfo?.nome || vendaPendente.plano_id,
                     ultimo_valor: vendaPendente.preco,
@@ -771,7 +771,7 @@ app.post('/api/captive-check/status', async (req, res, next) => {
             mac: macObj.mac_address,
             mikrotik_id: macObj.mikrotik_id,
             total_vendas: vendasAprovadasAtualizadas.length,
-            total_gasto: vendasAprovadasAtualizadas.reduce((acc, v) => acc + Number(v.preco || 0), 0),
+            total_gasto: vendasAprovadasAtualizadas.reduce((acc, v) => acc + truncar3Decimais(Number(v.preco || 0)), 0),
             ultimo_valor: vendaAprovada.preco,
             ultimo_plano: vendaAprovada.plano_id?.nome,
             username: vendaAprovada.senha_id?.usuario,
@@ -1108,7 +1108,7 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
         .eq('status', 'aprovado')
     );
     const totalVendas = vendasMac ? vendasMac.length : 0;
-    const totalGasto = vendasMac ? vendasMac.reduce((acc, v) => acc + Number(v.preco || 0), 0) : 0;
+    const totalGasto = vendasMac ? vendasMac.reduce((acc, v) => acc + truncar3Decimais(Number(v.preco || 0)), 0) : 0;
     const ultimoValor = vendasMac && vendasMac[0] ? vendasMac[0].preco : null;
     const ultimoPlano = vendasMac && vendasMac[0] ? vendasMac[0].plano_id : null;
     // Verifica se est├í dentro dos 10 minutos
@@ -1177,11 +1177,11 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
                     .eq('id', mikrotik_id)
                     .single()
                 );
-                let porcentagemAdmin = parseFloat(mikrotikInfo?.profitpercentage) || 10;
+                let porcentagemAdmin = truncar3Decimais(mikrotikInfo?.profitpercentage) || 10;
                 if (porcentagemAdmin > 100) porcentagemAdmin = 100;
                 if (porcentagemAdmin < 0) porcentagemAdmin = 0;
-                const comissaoAdmin = venda.preco * (porcentagemAdmin / 100);
-                const comissaoDono = venda.preco - comissaoAdmin;
+                const comissaoAdmin = truncar3Decimais(venda.preco * (porcentagemAdmin / 100));
+                const comissaoDono = truncar3Decimais(venda.preco - comissaoAdmin);
                 // Atualiza saldo do admin
                 await supabaseAdmin.rpc('incrementar_saldo_admin', { valor: comissaoAdmin });
                 // Atualiza saldo do dono do mikrotik
@@ -1196,8 +1196,8 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
                       status: 'aprovado',
                       pagamento_aprovado_em: pagamentoAprovadoEm,
                       senha_id: senha.id,
-                      lucro: comissaoAdmin,
-                      valor: comissaoDono
+                      lucro: truncar3Decimais(comissaoAdmin),
+                      valor: truncar3Decimais(comissaoDono)
                     })
                     .eq('id', venda.id)
                 );
@@ -1206,7 +1206,7 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
                   supabaseAdmin
                     .from('macs')
                     .update({
-                      total_gasto: (macObj.total_gasto || 0) + Number(venda.preco || 0),
+                      total_gasto: (macObj.total_gasto || 0) + truncar3Decimais(venda.preco || 0),
                       total_compras: (macObj.total_compras || 0) + 1
                     })
                     .eq('id', macObj.id)
@@ -2344,4 +2344,9 @@ app.listen(port, () => {
   // verificarPagamentosPendentesStartup(); // Função não definida - comentada
   verificarMacsExpirados();
 }); 
+
+// Função utilitária para truncar para 3 casas decimais sem arredondar
+function truncar3Decimais(valor) {
+  return Math.trunc(valor * 1000) / 1000;
+}
 
