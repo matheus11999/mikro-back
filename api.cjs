@@ -136,40 +136,47 @@ async function verificarPagamentosPendentesStartup() {
             // PAGAMENTO APROVADO
             console.log(`   ✅ APROVANDO pagamento ${venda.payment_id}...`);
             
-            // Busca informações do mikrotik
-            const mikrotikInfo = await handleSupabaseOperation(() =>
-              supabaseAdmin
-                .from('mikrotiks')
-                .select('cliente_id, profitpercentage')
-                .eq('id', venda.mikrotik_id.id)
-                .single()
-            );
+                          // VERIFICAÇÃO CRÍTICA: Evita duplicação de saldos
+              if (venda.status === 'aprovado') {
+                console.log(`   ⚠️  Venda ${venda.id} já foi aprovada anteriormente, evitando duplicação de saldos`);
+              } else {
+                // Busca informações do mikrotik
+                const mikrotikInfo = await handleSupabaseOperation(() =>
+                  supabaseAdmin
+                    .from('mikrotiks')
+                    .select('cliente_id, profitpercentage')
+                    .eq('id', venda.mikrotik_id.id)
+                    .single()
+                );
+                
+                // Calcula comissões baseado no valor total (não mais em preco)
+                let porcentagemAdmin = mikrotikInfo?.profitpercentage || 10;
+                if (porcentagemAdmin > 100) porcentagemAdmin = 100;
+                if (porcentagemAdmin < 0) porcentagemAdmin = 0;
+                
+                const valorTotal = venda.valor || venda.preco; // valor = preço total do plano
+                const comissaoAdmin = valorTotal * (porcentagemAdmin / 100);
+                const comissaoCliente = valorTotal - comissaoAdmin;
+                
+                // Atualiza saldos APENAS se a venda não foi aprovada antes
+                await supabaseAdmin.rpc('incrementar_saldo_admin', { valor: comissaoAdmin });
+                
+                if (mikrotikInfo?.cliente_id) {
+                  await supabaseAdmin.rpc('incrementar_saldo_cliente', { 
+                    cliente_id: mikrotikInfo.cliente_id, 
+                    valor: comissaoCliente 
+                  });
+                }
+                
+                console.log(`   💰 Saldos creditados - Admin: R$ ${comissaoAdmin.toFixed(2)}, Cliente: R$ ${comissaoCliente.toFixed(2)}`);
+              }
             
-            // Calcula comissões
-            let porcentagemAdmin = mikrotikInfo?.profitpercentage || 10;
-            if (porcentagemAdmin > 100) porcentagemAdmin = 100;
-            if (porcentagemAdmin < 0) porcentagemAdmin = 0;
-            
-            const comissaoAdmin = venda.preco * (porcentagemAdmin / 100);
-            const comissaoDono = venda.preco - comissaoAdmin;
-            
-            // Atualiza saldos
-            await supabaseAdmin.rpc('incrementar_saldo_admin', { valor: comissaoAdmin });
-            
-            if (mikrotikInfo?.cliente_id) {
-              await supabaseAdmin.rpc('incrementar_saldo_cliente', { 
-                cliente_id: mikrotikInfo.cliente_id, 
-                valor: comissaoDono 
-              });
-            }
-            
-            // Atualiza venda
+            // Atualiza venda - agora valor mantém o preço total, sem campo lucro
             atualizacaoVenda = {
               ...atualizacaoVenda,
               status: 'aprovado',
               pagamento_aprovado_em: agora,
-              lucro: comissaoAdmin,
-              valor: comissaoDono
+              valor: valorTotal // valor = preço total do plano
             };
             
             // Atualiza MAC
@@ -819,7 +826,7 @@ app.post('/api/captive-check/status', async (req, res, next) => {
                 });
               }
               
-              // Atualiza venda - valor agora representa a parte do cliente
+              // Atualiza venda - valor mantém o preço total do plano
               await handleSupabaseOperation(() =>
                 supabaseAdmin
                   .from('vendas')
@@ -827,8 +834,7 @@ app.post('/api/captive-check/status', async (req, res, next) => {
                     status: 'aprovado',
                     pagamento_aprovado_em: pagamentoAprovadoEm,
                     senha_id: senha.id,
-                    lucro: comissaoAdmin,
-                    valor: comissaoDono
+                    valor: vendaPendente.preco // valor = preço total do plano
                   })
                   .eq('id', vendaPendente.id)
               );
@@ -1310,7 +1316,7 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
                 if (mikrotikInfo && mikrotikInfo.cliente_id) {
                   await supabaseAdmin.rpc('incrementar_saldo_cliente', { cliente_id: mikrotikInfo.cliente_id, valor: comissaoDono });
                 }
-                // Atualiza venda - valor agora representa a parte do cliente
+                // Atualiza venda - valor mantém o preço total do plano
                 await handleSupabaseOperation(() =>
                   supabaseAdmin
                     .from('vendas')
@@ -1318,8 +1324,8 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
                       status: 'aprovado',
                       pagamento_aprovado_em: pagamentoAprovadoEm,
                       senha_id: senha.id,
-                      lucro: comissaoAdmin,
-                      valor: comissaoDono
+                      valor: venda.preco, // valor = preço total do plano
+                      valor_creditado_cliente: comissaoDono // preserva histórico do valor creditado
                     })
                     .eq('id', venda.id)
                 );
@@ -1524,31 +1530,39 @@ app.post('/api/webhook/mercadopago', async (req, res, next) => {
             
             console.log(`[WEBHOOK MP] Processando aprovação do pagamento ${paymentId}...`);
             
-            // Busca informações do mikrotik
-            const mikrotikInfo = await handleSupabaseOperation(() =>
-              supabaseAdmin
-                .from('mikrotiks')
-                .select('cliente_id, profitpercentage')
-                .eq('id', venda.mikrotik_id.id)
-                .single()
-            );
-            
-            // Calcula comissões
-            let porcentagemAdmin = mikrotikInfo?.profitpercentage || 10;
-            if (porcentagemAdmin > 100) porcentagemAdmin = 100;
-            if (porcentagemAdmin < 0) porcentagemAdmin = 0;
-            
-            const comissaoAdmin = venda.preco * (porcentagemAdmin / 100);
-            const comissaoDono = venda.preco - comissaoAdmin;
-            
-            // Atualiza saldos
-            await supabaseAdmin.rpc('incrementar_saldo_admin', { valor: comissaoAdmin });
-            
-            if (mikrotikInfo?.cliente_id) {
-              await supabaseAdmin.rpc('incrementar_saldo_cliente', { 
-                cliente_id: mikrotikInfo.cliente_id, 
-                valor: comissaoDono 
-              });
+            // VERIFICAÇÃO CRÍTICA: Evita duplicação de saldos no webhook
+            if (venda.status === 'aprovado') {
+              console.log(`[WEBHOOK MP] Venda ${venda.id} já foi aprovada anteriormente, evitando duplicação de saldos`);
+            } else {
+              // Busca informações do mikrotik
+              const mikrotikInfo = await handleSupabaseOperation(() =>
+                supabaseAdmin
+                  .from('mikrotiks')
+                  .select('cliente_id, profitpercentage')
+                  .eq('id', venda.mikrotik_id.id)
+                  .single()
+              );
+              
+              // Calcula comissões baseado no valor total
+              let porcentagemAdmin = mikrotikInfo?.profitpercentage || 10;
+              if (porcentagemAdmin > 100) porcentagemAdmin = 100;
+              if (porcentagemAdmin < 0) porcentagemAdmin = 0;
+              
+              const valorTotal = venda.valor || venda.preco; // valor = preço total do plano
+              const comissaoAdmin = valorTotal * (porcentagemAdmin / 100);
+              const comissaoCliente = valorTotal - comissaoAdmin;
+              
+              // Atualiza saldos APENAS se a venda não foi processada antes
+              await supabaseAdmin.rpc('incrementar_saldo_admin', { valor: comissaoAdmin });
+              
+              if (mikrotikInfo?.cliente_id) {
+                await supabaseAdmin.rpc('incrementar_saldo_cliente', { 
+                  cliente_id: mikrotikInfo.cliente_id, 
+                  valor: comissaoCliente 
+                });
+              }
+              
+              console.log(`[WEBHOOK MP] Saldos creditados - Admin: R$ ${comissaoAdmin.toFixed(2)}, Cliente: R$ ${comissaoCliente.toFixed(2)}`);
             }
             
             // Sistema SEM SENHAS - atualiza diretamente o status
@@ -1556,8 +1570,8 @@ app.post('/api/webhook/mercadopago', async (req, res, next) => {
               ...atualizacaoVenda,
               status: 'aprovado',
               pagamento_aprovado_em: agora,
-              lucro: comissaoAdmin,
-              valor: comissaoDono,
+              valor: valorTotal, // valor = preço total do plano
+              valor_creditado_cliente: comissaoCliente, // preserva histórico do valor creditado
               senha_id: null // Sistema sem senhas
             };
             
@@ -1656,30 +1670,36 @@ app.post('/api/webhook/mercadopago', async (req, res, next) => {
             // Se a venda estava aprovada, reverter saldos
             if (venda.status === 'aprovado') {
               try {
-                // Reverter saldos manualmente se a função não existir
-                if (venda.lucro && venda.lucro > 0) {
-                  await handleSupabaseOperation(() =>
-                    supabaseAdmin.rpc('incrementar_saldo_admin', { valor: -venda.lucro })
-                  );
-                }
+                // Busca informações do mikrotik para calcular a reversão
+                const mikrotikInfo = await handleSupabaseOperation(() =>
+                  supabaseAdmin
+                    .from('mikrotiks')
+                    .select('cliente_id, profitpercentage')
+                    .eq('id', venda.mikrotik_id)
+                    .single()
+                );
                 
-                if (venda.valor && venda.valor > 0) {
-                  const mikrotikInfo = await handleSupabaseOperation(() =>
-                    supabaseAdmin
-                      .from('mikrotiks')
-                      .select('cliente_id')
-                      .eq('id', venda.mikrotik_id)
-                      .single()
+                // Recalcula as comissões para reverter corretamente
+                let porcentagemAdmin = mikrotikInfo?.profitpercentage || 10;
+                if (porcentagemAdmin > 100) porcentagemAdmin = 100;
+                if (porcentagemAdmin < 0) porcentagemAdmin = 0;
+                
+                const valorTotal = venda.valor || venda.preco;
+                const comissaoAdmin = valorTotal * (porcentagemAdmin / 100);
+                const comissaoCliente = valorTotal - comissaoAdmin;
+                
+                // Reverter saldos com valores corretos
+                await handleSupabaseOperation(() =>
+                  supabaseAdmin.rpc('incrementar_saldo_admin', { valor: -comissaoAdmin })
+                );
+                
+                if (mikrotikInfo?.cliente_id) {
+                  await handleSupabaseOperation(() =>
+                    supabaseAdmin.rpc('incrementar_saldo_cliente', { 
+                      cliente_id: mikrotikInfo.cliente_id, 
+                      valor: -comissaoCliente 
+                    })
                   );
-                  
-                  if (mikrotikInfo?.cliente_id) {
-                    await handleSupabaseOperation(() =>
-                      supabaseAdmin.rpc('incrementar_saldo_cliente', { 
-                        cliente_id: mikrotikInfo.cliente_id, 
-                        valor: -venda.valor 
-                      })
-                    );
-                  }
                 }
                 
                 // Sistema sem senhas - não há necessidade de liberar senhas
@@ -1709,30 +1729,36 @@ app.post('/api/webhook/mercadopago', async (req, res, next) => {
             // Se a venda estava aprovada, reverter saldos
             if (venda.status === 'aprovado') {
               try {
-                // Reverter saldos manualmente
-                if (venda.lucro && venda.lucro > 0) {
-                  await handleSupabaseOperation(() =>
-                    supabaseAdmin.rpc('incrementar_saldo_admin', { valor: -venda.lucro })
-                  );
-                }
+                // Busca informações do mikrotik para calcular a reversão
+                const mikrotikInfo = await handleSupabaseOperation(() =>
+                  supabaseAdmin
+                    .from('mikrotiks')
+                    .select('cliente_id, profitpercentage')
+                    .eq('id', venda.mikrotik_id)
+                    .single()
+                );
                 
-                if (venda.valor && venda.valor > 0) {
-                  const mikrotikInfo = await handleSupabaseOperation(() =>
-                    supabaseAdmin
-                      .from('mikrotiks')
-                      .select('cliente_id')
-                      .eq('id', venda.mikrotik_id)
-                      .single()
+                // Recalcula as comissões para reverter corretamente
+                let porcentagemAdmin = mikrotikInfo?.profitpercentage || 10;
+                if (porcentagemAdmin > 100) porcentagemAdmin = 100;
+                if (porcentagemAdmin < 0) porcentagemAdmin = 0;
+                
+                const valorTotal = venda.valor || venda.preco;
+                const comissaoAdmin = valorTotal * (porcentagemAdmin / 100);
+                const comissaoCliente = valorTotal - comissaoAdmin;
+                
+                // Reverter saldos com valores corretos
+                await handleSupabaseOperation(() =>
+                  supabaseAdmin.rpc('incrementar_saldo_admin', { valor: -comissaoAdmin })
+                );
+                
+                if (mikrotikInfo?.cliente_id) {
+                  await handleSupabaseOperation(() =>
+                    supabaseAdmin.rpc('incrementar_saldo_cliente', { 
+                      cliente_id: mikrotikInfo.cliente_id, 
+                      valor: -comissaoCliente 
+                    })
                   );
-                  
-                  if (mikrotikInfo?.cliente_id) {
-                    await handleSupabaseOperation(() =>
-                      supabaseAdmin.rpc('incrementar_saldo_cliente', { 
-                        cliente_id: mikrotikInfo.cliente_id, 
-                        valor: -venda.valor 
-                      })
-                    );
-                  }
                 }
                 
                 console.log(`[WEBHOOK MP] Saldos revertidos devido a chargeback ${paymentId}`);
