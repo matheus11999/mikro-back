@@ -2276,8 +2276,8 @@ app.post('/api/mikrotik/auth-notification', validarTokenMikrotik, async (req, re
         .single()
     );
 
-    // Se o MAC foi conectado com sucesso e tem plano ativo, marcar venda como autenticada
-    if (novoStatus === 'conectado' && planoAtual && !planoExpirado) {
+    // Se o MAC foi conectado, marcar a venda mais recente como autenticada
+    if (novoStatus === 'conectado') {
       // Buscar a venda mais recente aprovada para este MAC
       const vendaParaAutenticar = macObj.vendas
         ?.filter(v => v.status === 'aprovado' && v.pagamento_aprovado_em)
@@ -2292,10 +2292,13 @@ app.post('/api/mikrotik/auth-notification', validarTokenMikrotik, async (req, re
               .eq('id', vendaParaAutenticar.id)
           );
           
-          console.log(`[MIKROTIK AUTH] Venda ${vendaParaAutenticar.id} marcada como autenticada para MAC ${mac_address}`);
+          console.log(`[MIKROTIK AUTH] ✅ Venda ${vendaParaAutenticar.id} marcada como autenticada para MAC ${mac_address}`);
+          console.log(`[MIKROTIK AUTH] ✅ Plano: ${vendaParaAutenticar.plano_id?.nome || 'N/A'} - Status: conectado`);
         } catch (err) {
-          console.log('[MIKROTIK AUTH] Coluna autenticado ainda não existe, continuando sem marcar...');
+          console.log('[MIKROTIK AUTH] ⚠️ Coluna autenticado ainda não existe, continuando sem marcar...');
         }
+      } else {
+        console.log(`[MIKROTIK AUTH] ⚠️ Nenhuma venda aprovada encontrada para marcar como autenticada: ${mac_address}`);
       }
     }
 
