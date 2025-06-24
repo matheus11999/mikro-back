@@ -2093,11 +2093,23 @@ app.post('/api/mikrotik/auth-notification', validarTokenMikrotik, async (req, re
       };
     }
 
-    // Buscar MAC no banco de dados
+    // Buscar MAC com informações do plano atual
     const macs = await handleSupabaseOperation(() =>
       supabaseAdmin
         .from('macs')
-        .select('*')
+        .select(`
+          *,
+          vendas(
+            id,
+            plano_id(
+              id,
+              nome,
+              duracao
+            ),
+            pagamento_aprovado_em,
+            status
+          )
+        `)
         .eq('mac_address', mac_address)
         .eq('mikrotik_id', mikrotik_id)
     );
@@ -2151,14 +2163,41 @@ app.post('/api/mikrotik/auth-notification', validarTokenMikrotik, async (req, re
         novoStatus = 'ativo'; // Status genérico para ações não reconhecidas
     }
 
+    // Verificar plano atual e tempo restante
+    let planoAtual = null;
+    let tempoRestante = 0;
+
+    if (macObj.vendas && macObj.vendas.length > 0) {
+      // Pegar a venda mais recente aprovada
+      const ultimaVendaAprovada = macObj.vendas
+        .filter(v => v.status === 'aprovado' && v.pagamento_aprovado_em)
+        .sort((a, b) => new Date(b.pagamento_aprovado_em) - new Date(a.pagamento_aprovado_em))[0];
+
+      if (ultimaVendaAprovada && ultimaVendaAprovada.plano_id) {
+        planoAtual = ultimaVendaAprovada.plano_id;
+        const inicioPlano = new Date(ultimaVendaAprovada.pagamento_aprovado_em);
+        const duracaoMinutos = planoAtual.duracao || 60;
+        const fimPlano = new Date(inicioPlano.getTime() + duracaoMinutos * 60000);
+        tempoRestante = Math.max(0, Math.floor((fimPlano.getTime() - new Date().getTime()) / 60000));
+
+        // Se o tempo expirou e o status está conectando, forçar desconexão
+        if (tempoRestante === 0 && novoStatus === 'conectado') {
+          novoStatus = 'desconectado';
+          console.log('[MIKROTIK AUTH] Tempo expirado, forçando desconexão:', mac_address);
+        }
+      }
+    }
+
     console.log('[MIKROTIK AUTH] Atualizando status:', {
       mac: mac_address,
       statusAnterior: macObj.status,
       novoStatus,
-      action
+      action,
+      planoAtual: planoAtual ? planoAtual.nome : null,
+      tempoRestante
     });
 
-    // Preparar dados para atualização (apenas campos essenciais)
+    // Preparar dados para atualização
     const dadosAtualizacao = {
       status: novoStatus,
       ultimo_acesso: agora
@@ -2170,28 +2209,22 @@ app.post('/api/mikrotik/auth-notification', validarTokenMikrotik, async (req, re
         .from('macs')
         .update(dadosAtualizacao)
         .eq('id', macObj.id)
-        .select()
+        .select(`
+          *,
+          vendas(
+            id,
+            plano_id(
+              id,
+              nome,
+              duracao
+            ),
+            pagamento_aprovado_em,
+            status
+          )
+        `)
         .single()
     );
 
-    // Log simples no console (sem tabela de auditoria)
-    console.log('[MIKROTIK AUTH] Ação processada:', {
-      mac_address,
-      action,
-      usuario: usuario || 'N/A',
-      status_anterior: macObj.status,
-      status_novo: novoStatus,
-      timestamp: agora
-    });
-
-    console.log('[MIKROTIK AUTH] MAC atualizado com sucesso:', {
-      id: macAtualizado.id,
-      mac_address: macAtualizado.mac_address,
-      status: macAtualizado.status,
-      ultimo_acesso: macAtualizado.ultimo_acesso
-    });
-
-    // Resposta de sucesso
     return res.json({
       success: true,
       message: 'Autenticação registrada com sucesso',
@@ -2201,6 +2234,11 @@ app.post('/api/mikrotik/auth-notification', validarTokenMikrotik, async (req, re
         status_anterior: macObj.status,
         status_atual: macAtualizado.status,
         ultimo_acesso: macAtualizado.ultimo_acesso,
+        plano_atual: planoAtual ? {
+          nome: planoAtual.nome,
+          duracao: planoAtual.duracao,
+          tempo_restante: tempoRestante
+        } : null,
         action_processada: action
       }
     });

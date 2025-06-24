@@ -35,86 +35,86 @@
                 # Processar cada linha (formato: mac-minutos)
                 :local pos 0
                 :local linhaAtual ""
-            
-            # Adicionar quebra de linha no final se não houver
-            :if ([:find $vendas "\n"] < 0) do={
-                :set vendas ($vendas . "\n")
-            }
-            
-            # Processar cada linha
-            :while ([:find $vendas "\n" $pos] >= 0) do={
-                :local proximaLinha [:find $vendas "\n" $pos]
-                :set linhaAtual [:pick $vendas $pos $proximaLinha]
-                :set pos ($proximaLinha + 1)
                 
-                # Pular linhas vazias
-                :if ([:len $linhaAtual] > 0) do={
-                    :log info "Processando linha: $linhaAtual"
+                # Adicionar quebra de linha no final se não houver
+                :if ([:find $vendas "\n"] < 0) do={
+                    :set vendas ($vendas . "\n")
+                }
+                
+                # Processar cada linha
+                :while ([:find $vendas "\n" $pos] >= 0) do={
+                    :local proximaLinha [:find $vendas "\n" $pos]
+                    :set linhaAtual [:pick $vendas $pos $proximaLinha]
+                    :set pos ($proximaLinha + 1)
                     
-                    # Encontrar posição do hífen (separador mac-minutos)
-                    :local posHifen [:find $linhaAtual "-"]
-                    
-                    :if ($posHifen >= 0) do={
-                        :local mac [:pick $linhaAtual 0 $posHifen]
-                        :local minutosStr [:pick $linhaAtual ($posHifen + 1) [:len $linhaAtual]]
-                        :local minutos [:tonum $minutosStr]
+                    # Pular linhas vazias
+                    :if ([:len $linhaAtual] > 0) do={
+                        :log info "Processando linha: $linhaAtual"
                         
-                        :log info "MAC: $mac, Minutos: $minutos"
+                        # Encontrar posição do hífen (separador mac-minutos)
+                        :local posHifen [:find $linhaAtual "-"]
                         
-                        # Verificar se este MAC já foi processado
-                        :if ([:find $macs $mac] < 0) do={
-                            # Remover binding existente (se houver)
-                            :do {
-                                /ip hotspot ip-binding remove [find mac-address=$mac]
-                                :log info "Binding anterior removido para: $mac"
-                            } on-error={
-                                :log info "Nenhum binding anterior para: $mac"
+                        :if ($posHifen >= 0) do={
+                            :local mac [:pick $linhaAtual 0 $posHifen]
+                            :local minutosStr [:pick $linhaAtual ($posHifen + 1) [:len $linhaAtual]]
+                            :local minutos [:tonum $minutosStr]
+                            
+                            :log info "MAC: $mac, Minutos: $minutos"
+                            
+                            # Verificar se este MAC já foi processado
+                            :if ([:find $macs $mac] < 0) do={
+                                # Remover binding existente (se houver)
+                                :do {
+                                    /ip hotspot ip-binding remove [find mac-address=$mac]
+                                    :log info "Binding anterior removido para: $mac"
+                                } on-error={
+                                    :log info "Nenhum binding anterior para: $mac"
+                                }
+                                
+                                # Calcular horário de expiração
+                                :local agora [/system clock get time]
+                                :local h [:tonum [:pick $agora 0 2]]
+                                :local m [:tonum [:pick $agora 3 5]]
+                                :local s [:tonum [:pick $agora 6 8]]
+                                
+                                # Converter para minutos totais
+                                :local minutosAtuais (($h * 60) + $m)
+                                :local novoMinutosTotais ($minutosAtuais + $minutos)
+                                
+                                # Calcular nova hora e minutos
+                                :local novaH ($novoMinutosTotais / 60)
+                                :local novaM ($novoMinutosTotais % 60)
+                                
+                                # Tratar mudança de dia
+                                :if ($novaH >= 24) do={
+                                    :set novaH ($novaH - 24)
+                                }
+                                
+                                # Formatar com zeros à esquerda
+                                :local hs [:tostr $novaH]
+                                :local ms [:tostr $novaM]
+                                :if ([:len $hs] = 1) do={ :set hs ("0" . $hs) }
+                                :if ([:len $ms] = 1) do={ :set ms ("0" . $ms) }
+                                
+                                # Criar comentário com data de expiração
+                                :local dataExpire ([/system clock get date] . "-" . $hs . $ms)
+                                :local comentario ("PIX-EXPIRE-" . $dataExpire . "-" . $mac)
+                                
+                                # Criar novo binding
+                                /ip hotspot ip-binding add mac-address=$mac type=bypassed comment=$comentario
+                                :log info "Binding criado: $mac até $hs:$ms ($minutos min)"
+                                
+                                # Adicionar à lista de MACs processados
+                                :set macs ($macs . $mac . ";")
+                            } else={
+                                :log info "MAC $mac já foi processado, ignorando"
                             }
-                            
-                            # Calcular horário de expiração
-                            :local agora [/system clock get time]
-                            :local h [:tonum [:pick $agora 0 2]]
-                            :local m [:tonum [:pick $agora 3 5]]
-                            :local s [:tonum [:pick $agora 6 8]]
-                            
-                            # Converter para minutos totais
-                            :local minutosAtuais (($h * 60) + $m)
-                            :local novoMinutosTotais ($minutosAtuais + $minutos)
-                            
-                            # Calcular nova hora e minutos
-                            :local novaH ($novoMinutosTotais / 60)
-                            :local novaM ($novoMinutosTotais % 60)
-                            
-                            # Tratar mudança de dia
-                            :if ($novaH >= 24) do={
-                                :set novaH ($novaH - 24)
-                            }
-                            
-                            # Formatar com zeros à esquerda
-                            :local hs [:tostr $novaH]
-                            :local ms [:tostr $novaM]
-                            :if ([:len $hs] = 1) do={ :set hs ("0" . $hs) }
-                            :if ([:len $ms] = 1) do={ :set ms ("0" . $ms) }
-                            
-                            # Criar comentário com data de expiração
-                            :local dataExpire ([/system clock get date] . "-" . $hs . $ms)
-                            :local comentario ("PIX-EXPIRE-" . $dataExpire . "-" . $mac)
-                            
-                            # Criar novo binding
-                            /ip hotspot ip-binding add mac-address=$mac type=bypassed comment=$comentario
-                            :log info "Binding criado: $mac até $hs:$ms ($minutos min)"
-                            
-                            # Adicionar à lista de MACs processados
-                            :set macs ($macs . $mac . ";")
                         } else={
-                            :log info "MAC $mac já foi processado, ignorando"
+                            :log warning "Formato inválido na linha: $linhaAtual"
                         }
-                    } else={
-                        :log warning "Formato inválido na linha: $linhaAtual"
                     }
                 }
-            }
-            
+                
                 # Parar tentativas se obteve sucesso
                 :set tentativa 10
             }
