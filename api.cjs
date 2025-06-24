@@ -84,8 +84,8 @@ async function processarAprovacaoPagamento(venda, mpData) {
 
     const porcentagemAdmin = Math.max(0, Math.min(100, mikrotikInfo?.profitpercentage || 10));
     const valorTotal = venda.valor || venda.preco; // Mantém compatibilidade com a coluna 'preco' se 'valor' não existir.
-    const comissaoAdmin = valorTotal * (porcentagemAdmin / 100);
-    const valorCreditadoCliente = valorTotal - comissaoAdmin;
+    const valorCreditadoCliente = valorTotal * ((100 - porcentagemAdmin) / 100); // Cliente recebe o que sobra após a comissão do admin
+    const comissaoAdmin = valorTotal - valorCreditadoCliente; // Admin recebe a diferença
 
     // 1. Incrementar saldos
     await supabaseAdmin.rpc('incrementar_saldo_admin', { valor: comissaoAdmin });
