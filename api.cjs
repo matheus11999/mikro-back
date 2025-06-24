@@ -1561,7 +1561,7 @@ app.post('/api/webhook/mercadopago', async (req, res, next) => {
               senha_id: null // Sistema sem senhas
             };
             
-            // Atualiza MAC com status conectado (acesso liberado)
+            // Atualiza MAC com pagamento aprovado (MAS NÃO conecta automaticamente)
             await handleSupabaseOperation(() =>
               supabaseAdmin
                 .from('macs')
@@ -1570,10 +1570,10 @@ app.post('/api/webhook/mercadopago', async (req, res, next) => {
                   total_compras: (venda.mac_id.total_compras || 0) + 1,
                   ultimo_plano: venda.plano_id.nome,
                   ultimo_valor: venda.preco,
-                  ultimo_acesso: agora,
-                  status: 'conectado', // MAC fica conectado
                   status_pagamento: 'aprovado',
                   pagamento_aprovado_em: agora
+                  // REMOVIDO: status: 'conectado' - MAC só conecta quando cliente realmente se conectar
+                  // REMOVIDO: ultimo_acesso - só atualiza quando cliente se conectar de verdade
                 })
                 .eq('id', venda.mac_id.id)
             );
