@@ -74,8 +74,8 @@ async function verificarPagamentosPendentesStartup() {
     console.log('\n🔍 VERIFICANDO PAGAMENTOS PENDENTES NO STARTUP...');
     console.log('='.repeat(60));
     
-    // Buscar vendas com status pendente, processando, autorizado ou criado das últimas 4 horas
-    const statusPendentes = ['pendente', 'processando', 'autorizado', 'criado'];
+    // Buscar vendas com status pendente, processando, autorizado, criado ou aguardando das últimas 4 horas
+    const statusPendentes = ['aguardando', 'pendente', 'processando', 'autorizado', 'criado'];
     const quatroHorasAtras = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(); // 4 horas atrás
     
     console.log(`📅 Buscando vendas pendentes desde: ${quatroHorasAtras}`);
@@ -1551,16 +1551,17 @@ app.post('/api/webhook/mercadopago', async (req, res, next) => {
               });
             }
             
-            // Atualiza venda com aprovação
+            // Sistema SEM SENHAS - atualiza diretamente o status
             atualizacaoVenda = {
               ...atualizacaoVenda,
               status: 'aprovado',
               pagamento_aprovado_em: agora,
               lucro: comissaoAdmin,
-              valor: comissaoDono
+              valor: comissaoDono,
+              senha_id: null // Sistema sem senhas
             };
             
-            // Atualiza MAC
+            // Atualiza MAC com status conectado (acesso liberado)
             await handleSupabaseOperation(() =>
               supabaseAdmin
                 .from('macs')
@@ -1570,6 +1571,7 @@ app.post('/api/webhook/mercadopago', async (req, res, next) => {
                   ultimo_plano: venda.plano_id.nome,
                   ultimo_valor: venda.preco,
                   ultimo_acesso: agora,
+                  status: 'conectado', // MAC fica conectado
                   status_pagamento: 'aprovado',
                   pagamento_aprovado_em: agora
                 })
