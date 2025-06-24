@@ -2168,6 +2168,7 @@ app.post('/api/mikrotik/auth-notification', validarTokenMikrotik, async (req, re
     // Verificar plano atual e tempo restante
     let planoAtual = null;
     let tempoRestante = 0;
+    let planoExpirado = false;
 
     if (macObj.vendas && macObj.vendas.length > 0) {
       // Pegar a venda mais recente aprovada
@@ -2182,12 +2183,21 @@ app.post('/api/mikrotik/auth-notification', validarTokenMikrotik, async (req, re
         const fimPlano = new Date(inicioPlano.getTime() + duracaoMinutos * 60000);
         tempoRestante = Math.max(0, Math.floor((fimPlano.getTime() - new Date().getTime()) / 60000));
 
-        // Se o tempo expirou e o status está conectando, forçar desconexão
-        if (tempoRestante === 0 && novoStatus === 'conectado') {
+        // Verificar se o plano expirou
+        planoExpirado = tempoRestante === 0;
+
+        // Se o tempo expirou e está tentando conectar, forçar desconexão
+        if (planoExpirado && (action.toLowerCase() === 'login' || action.toLowerCase() === 'connect' || action.toLowerCase() === 'authenticated')) {
           novoStatus = 'desconectado';
-          console.log('[MIKROTIK AUTH] Tempo expirado, forçando desconexão:', mac_address);
+          console.log(`[MIKROTIK AUTH] Plano expirado (${planoAtual.nome}), bloqueando conexão:`, mac_address);
         }
       }
+    }
+
+    // Lógica especial para quando não há plano ativo
+    if (!planoAtual && (action.toLowerCase() === 'login' || action.toLowerCase() === 'connect' || action.toLowerCase() === 'authenticated')) {
+      novoStatus = 'ativo'; // Status para MAC sem plano tentando conectar
+      console.log('[MIKROTIK AUTH] MAC sem plano ativo tentando conectar:', mac_address);
     }
 
     console.log('[MIKROTIK AUTH] Atualizando status:', {
@@ -2196,7 +2206,8 @@ app.post('/api/mikrotik/auth-notification', validarTokenMikrotik, async (req, re
       novoStatus,
       action,
       planoAtual: planoAtual ? planoAtual.nome : null,
-      tempoRestante
+      tempoRestante,
+      planoExpirado
     });
 
     // Preparar dados para atualização
@@ -2229,7 +2240,11 @@ app.post('/api/mikrotik/auth-notification', validarTokenMikrotik, async (req, re
 
     return res.json({
       success: true,
-      message: 'Autenticação registrada com sucesso',
+      message: planoExpirado 
+        ? 'Plano expirado - conexão bloqueada' 
+        : !planoAtual && novoStatus === 'ativo' 
+          ? 'MAC sem plano ativo detectado'
+          : 'Autenticação registrada com sucesso',
       data: {
         mac_id: macAtualizado.id,
         mac_address: macAtualizado.mac_address,
@@ -2237,11 +2252,14 @@ app.post('/api/mikrotik/auth-notification', validarTokenMikrotik, async (req, re
         status_atual: macAtualizado.status,
         ultimo_acesso: macAtualizado.ultimo_acesso,
         plano_atual: planoAtual ? {
+          id: planoAtual.id,
           nome: planoAtual.nome,
           duracao: planoAtual.duracao,
-          tempo_restante: tempoRestante
+          tempo_restante: tempoRestante,
+          expirado: planoExpirado
         } : null,
-        action_processada: action
+        action_processada: action,
+        conexao_permitida: !planoExpirado && (planoAtual || novoStatus !== 'conectado')
       }
     });
 
@@ -2416,57 +2434,98 @@ app.get('/api/admin/mikrotiks', async (req, res, next) => {
   }
 });
 
-// Endpoint para verificar MACs conectados e retornar lista para comparar com IP bindings
-app.post('/api/mikrotik/conectados', validarTokenMikrotik, async (req, res, next) => {
-  try {
-    const mikrotik_id = req.mikrotik_id; // Já validado pelo middleware
-    const mikrotikNome = req.mikrotik.nome;
-    
-    console.log(`[${formatDateWithTimezone()}] [CONECTADOS] Consultando MACs conectados para:`, mikrotikNome);
+// ==================================================
+// FUNÇÃO PARA VERIFICAR E DESCONECTAR MACs EXPIRADOS
+// ==================================================
 
-    // Buscar MACs marcados como "conectado" no banco para este MikroTik
+async function verificarMacsExpirados() {
+  try {
+    console.log(`[${formatDateWithTimezone()}] [EXPIRACAO] Verificando MACs com tempo expirado...`);
+
+    // Buscar todos os MACs conectados com suas vendas
     const macsConectados = await handleSupabaseOperation(() =>
       supabaseAdmin
         .from('macs')
-        .select('id, mac_address, status, ultimo_acesso, ultimo_plano, total_compras')
-        .eq('mikrotik_id', mikrotik_id)
+        .select(`
+          id,
+          mac_address,
+          mikrotik_id,
+          status,
+          vendas(
+            id,
+            plano_id(
+              id,
+              nome,
+              duracao
+            ),
+            pagamento_aprovado_em,
+            status
+          )
+        `)
         .eq('status', 'conectado')
-        .order('ultimo_acesso', { ascending: false })
     );
 
-    console.log(`[CONECTADOS] Encontrados ${macsConectados.length} MACs conectados no banco para ${mikrotikNome}`);
+    if (!macsConectados || macsConectados.length === 0) {
+      console.log('[EXPIRACAO] Nenhum MAC conectado encontrado');
+      return;
+    }
 
-    // Preparar lista de MACs para retorno
-    const macsLista = macsConectados.map(mac => ({
-      mac_address: mac.mac_address,
-      ultimo_acesso: mac.ultimo_acesso,
-      ultimo_plano: mac.ultimo_plano || 'N/A',
-      total_compras: mac.total_compras || 0
-    }));
+    const agora = new Date();
+    const macsParaDesconectar = [];
 
-    // Criar string de MACs separados por ; para uso no script MikroTik
-    const macsString = macsConectados.map(mac => mac.mac_address).join(';');
+    for (const mac of macsConectados) {
+      if (!mac.vendas || mac.vendas.length === 0) continue;
 
-    res.json({
-      success: true,
-      mikrotik: {
-        id: mikrotik_id,
-        nome: mikrotikNome
-      },
-      total_conectados: macsConectados.length,
-      macs_lista: macsLista,
-      macs_string: macsString, // Para usar no script MikroTik
-      timestamp: new Date().toISOString(),
-      message: macsConectados.length > 0 
-        ? `${macsConectados.length} MACs conectados encontrados` 
-        : 'Nenhum MAC conectado no banco'
-    });
+      // Pegar a venda mais recente aprovada
+      const ultimaVendaAprovada = mac.vendas
+        .filter(v => v.status === 'aprovado' && v.pagamento_aprovado_em)
+        .sort((a, b) => new Date(b.pagamento_aprovado_em) - new Date(a.pagamento_aprovado_em))[0];
+
+      if (ultimaVendaAprovada && ultimaVendaAprovada.plano_id) {
+        const inicioPlano = new Date(ultimaVendaAprovada.pagamento_aprovado_em);
+        const duracaoMinutos = ultimaVendaAprovada.plano_id.duracao || 60;
+        const fimPlano = new Date(inicioPlano.getTime() + duracaoMinutos * 60000);
+
+        // Se o tempo expirou, marcar para desconexão
+        if (agora >= fimPlano) {
+          macsParaDesconectar.push({
+            id: mac.id,
+            mac_address: mac.mac_address,
+            plano: ultimaVendaAprovada.plano_id.nome,
+            tempo_expirado: Math.floor((agora.getTime() - fimPlano.getTime()) / 60000)
+          });
+        }
+      }
+    }
+
+    if (macsParaDesconectar.length > 0) {
+      console.log(`[EXPIRACAO] Encontrados ${macsParaDesconectar.length} MACs expirados para desconectar`);
+
+      // Desconectar MACs expirados
+      for (const mac of macsParaDesconectar) {
+        await handleSupabaseOperation(() =>
+          supabaseAdmin
+            .from('macs')
+            .update({ 
+              status: 'desconectado',
+              ultimo_acesso: agora.toISOString()
+            })
+            .eq('id', mac.id)
+        );
+
+        console.log(`[EXPIRACAO] MAC ${mac.mac_address} desconectado - Plano ${mac.plano} expirado há ${mac.tempo_expirado} minutos`);
+      }
+    } else {
+      console.log('[EXPIRACAO] Nenhum MAC expirado encontrado');
+    }
 
   } catch (err) {
-    console.error(`[${formatDateWithTimezone()}] [CONECTADOS] Erro na consulta:`, err);
-    next(err);
+    console.error('[EXPIRACAO] Erro ao verificar MACs expirados:', err);
   }
-});
+}
+
+// Agendar verificação de MACs expirados a cada 2 minutos
+setInterval(verificarMacsExpirados, 2 * 60 * 1000);
 
 // Endpoint para verificar status de MikroTiks online/offline
 app.get('/api/mikrotik/status', async (req, res, next) => {
@@ -2590,9 +2649,10 @@ app.listen(port, () => {
   console.log(`💓 Sistema de heartbeat MikroTik ativo`);
   console.log('='.repeat(50));
   
-  // Aguarda 3 segundos e então verifica pagamentos pendentes
+  // Aguarda 3 segundos e então verifica pagamentos pendentes e MACs expirados
   setTimeout(() => {
     verificarPagamentosPendentesStartup();
+    verificarMacsExpirados();
   }, 3000);
 }); 
 
