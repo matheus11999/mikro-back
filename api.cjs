@@ -82,7 +82,7 @@ async function processarAprovacaoPagamento(venda, mpData) {
         supabaseAdmin.from('mikrotiks').select('cliente_id, profitpercentage').eq('id', venda.mikrotik_id.id).single()
     );
 
-    const porcentagemAdmin = Math.max(0, Math.min(100, mikrotikInfo?.profitpercentage || 10));
+    const porcentagemAdmin = Math.max(0, Math.min(100, parseFloat(mikrotikInfo?.profitpercentage) || 10));
     const valorTotal = venda.valor || venda.preco; // Mantém compatibilidade com a coluna 'preco' se 'valor' não existir.
     const valorCreditadoCliente = Number((valorTotal * ((100 - porcentagemAdmin) / 100)).toFixed(3)); // Cliente recebe o que sobra após a comissão do admin
     const comissaoAdmin = valorTotal - valorCreditadoCliente; // Admin recebe a diferença
@@ -679,7 +679,7 @@ app.post('/api/captive-check/status', async (req, res, next) => {
                   .single()
               );
               
-              let porcentagemAdmin = mikrotikInfo?.profitpercentage || 10;
+              let porcentagemAdmin = parseFloat(mikrotikInfo?.profitpercentage) || 10;
               if (porcentagemAdmin > 100) porcentagemAdmin = 100;
               if (porcentagemAdmin < 0) porcentagemAdmin = 0;
               
@@ -1177,7 +1177,7 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
                     .eq('id', mikrotik_id)
                     .single()
                 );
-                let porcentagemAdmin = mikrotikInfo?.profitpercentage || 10;
+                let porcentagemAdmin = parseFloat(mikrotikInfo?.profitpercentage) || 10;
                 if (porcentagemAdmin > 100) porcentagemAdmin = 100;
                 if (porcentagemAdmin < 0) porcentagemAdmin = 0;
                 const comissaoAdmin = venda.preco * (porcentagemAdmin / 100);
