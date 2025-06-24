@@ -1567,7 +1567,7 @@ app.post('/api/webhook/mercadopago', async (req, res, next) => {
           atualizacaoVenda.status = mpData.status;
         }
 
-        if (Object.keys(atualizacaoVenda).length > 3) { // >3 para garantir que não seja só o update de status
+        if (Object.keys(atualizacaoVenda).length > 3) {
             await handleSupabaseOperation(() => supabaseAdmin.from('vendas').update(atualizacaoVenda).eq('id', venda.id));
             console.log(`[WEBHOOK MP] Status da venda ${venda.id} atualizado: ${statusAnterior} -> ${atualizacaoVenda.status}`);
         }
