@@ -84,7 +84,7 @@ async function processarAprovacaoPagamento(venda, mpData) {
 
     const porcentagemAdmin = Math.max(0, Math.min(100, mikrotikInfo?.profitpercentage || 10));
     const valorTotal = venda.valor || venda.preco; // Mantém compatibilidade com a coluna 'preco' se 'valor' não existir.
-    const valorCreditadoCliente = valorTotal * ((100 - porcentagemAdmin) / 100); // Cliente recebe o que sobra após a comissão do admin
+    const valorCreditadoCliente = Number((valorTotal * ((100 - porcentagemAdmin) / 100)).toFixed(3)); // Cliente recebe o que sobra após a comissão do admin
     const comissaoAdmin = valorTotal - valorCreditadoCliente; // Admin recebe a diferença
 
     // 1. Incrementar saldos
@@ -92,7 +92,7 @@ async function processarAprovacaoPagamento(venda, mpData) {
     if (mikrotikInfo?.cliente_id) {
         await supabaseAdmin.rpc('incrementar_saldo_cliente', { cliente_id: mikrotikInfo.cliente_id, valor: valorCreditadoCliente });
     }
-    console.log(`[PROCESSAMENTO] Saldos creditados - Admin: R$ ${comissaoAdmin.toFixed(2)}, Cliente: R$ ${valorCreditadoCliente.toFixed(2)}`);
+    console.log(`[PROCESSAMENTO] Saldos creditados - Admin: R$ ${comissaoAdmin.toFixed(2)}, Cliente: R$ ${valorCreditadoCliente.toFixed(3)}`);
 
     // 2. Buscar dados históricos do plano para garantir consistência
     const { data: planoInfo } = await supabaseAdmin.from('planos').select('nome, duracao, preco').eq('id', venda.plano_id.id).single();
@@ -163,7 +163,7 @@ async function processarOutrosStatus(venda, mpData) {
                   await handleSupabaseOperation(() => supabaseAdmin.rpc('incrementar_saldo_cliente', { cliente_id: mikrotikInfo.cliente_id, valor: -valorClienteReverter }));
               }
             }
-            console.log(`[PROCESSAMENTO] Saldos revertidos. Admin: -${valorAdminReverter.toFixed(2)}, Cliente: -${valorClienteReverter.toFixed(2)}`);
+            console.log(`[PROCESSAMENTO] Saldos revertidos. Admin: -${valorAdminReverter.toFixed(2)}, Cliente: -${valorClienteReverter.toFixed(3)}`);
         }
     } else {
         console.log(`[PROCESSAMENTO] Status não crítico para ${venda.payment_id}: ${mpData.status}`);
@@ -2172,6 +2172,100 @@ app.get('/api/mikrotik/status', async (req, res, next) => {
 
   } catch (err) {
     console.error('[MIKROTIK STATUS] Erro ao verificar status:', err);
+    next(err);
+  }
+});
+
+// Endpoint para instalação automática de scripts do MikroTik
+app.post('/api/mikrotik/install-scripts', validarTokenMikrotik, async (req, res, next) => {
+  try {
+    const { mikrotik_id, token } = req.body;
+    
+    console.log(`[INSTALL SCRIPTS] Gerando scripts para MikroTik: ${mikrotik_id}`);
+
+    // Scripts para remoção (caso já existam)
+    const removalCommands = [
+      '/system script remove [find name="pix-notifier-connect"]',
+      '/system script remove [find name="pix-notifier-disconnect"]', 
+      '/system script remove [find name="pix-verificador"]',
+      '/system script remove [find name="pix-heartbeat"]'
+    ];
+
+    // Script 1: Notificador de Conexão
+    const notificadorConexao = `:global pixMacsNotificar; :global pixAcaoNotificar; :log info "Notificador iniciado"; :log info "MACs: $pixMacsNotificar"; :log info "Acao: $pixAcaoNotificar"; :local url "https://api.lucro.top/api/mikrotik/auth-notification"; :local pos 0; :local sucessos 0; :local total 0; :while ([:find $pixMacsNotificar ";" $pos] >= 0) do={ :local fim [:find $pixMacsNotificar ";" $pos]; :local mac [:pick $pixMacsNotificar $pos $fim]; :if ([:len $mac] > 0) do={ :set total ($total + 1); :log info "Processando: $mac"; :local data "{\\"token\\":\\"${token}\\",\\"mac_address\\":\\"$mac\\",\\"mikrotik_id\\":\\"${mikrotik_id}\\",\\"action\\":\\"$pixAcaoNotificar\\"}"; :local tentativa 1; :local enviado false; :while ($tentativa <= 3 and !$enviado) do={ :log info "Tentativa $tentativa: $mac"; :do { /tool fetch url=$url http-method=post http-header-field="Content-Type: application/json" http-data=$data keep-result=no; :set enviado true; :set sucessos ($sucessos + 1); :log info "Sucesso: $mac" } on-error={ :log error "Erro tentativa $tentativa: $mac"; :set tentativa ($tentativa + 1); :if ($tentativa <= 3) do={ :delay 1s } } }; :if (!$enviado) do={ :log error "Falha total: $mac" } }; :set pos ($fim + 1) }; :if ($sucessos = $total and $total > 0) do={ :set pixMacsNotificar; :set pixAcaoNotificar; :log info "Todas enviadas - variaveis limpas ($sucessos/$total)" } else={ :log warning "Falhas detectadas - variaveis mantidas ($sucessos/$total)" }; :log info "Finalizado"`;
+
+    // Script 2: Notificador de Desconexão
+    const notificadorDesconexao = `:global pixMacsDesconectar; :log info "Notificador desconectado iniciado"; :log info "MACs: $pixMacsDesconectar"; :local url "https://api.lucro.top/api/mikrotik/auth-notification"; :local pos 0; :local sucessos 0; :local total 0; :while ([:find $pixMacsDesconectar ";" $pos] >= 0) do={ :local fim [:find $pixMacsDesconectar ";" $pos]; :local mac [:pick $pixMacsDesconectar $pos $fim]; :if ([:len $mac] > 0) do={ :set total ($total + 1); :log info "Processando desconexao: $mac"; :local data "{\\"token\\":\\"${token}\\",\\"mac_address\\":\\"$mac\\",\\"mikrotik_id\\":\\"${mikrotik_id}\\",\\"action\\":\\"disconnect\\"}"; :local tentativa 1; :local enviado false; :while ($tentativa <= 3 and !$enviado) do={ :log info "Tentativa $tentativa desconexao: $mac"; :do { /tool fetch url=$url http-method=post http-header-field="Content-Type: application/json" http-data=$data keep-result=no; :set enviado true; :set sucessos ($sucessos + 1); :log info "Sucesso desconexao: $mac" } on-error={ :log error "Erro tentativa $tentativa desconexao: $mac"; :set tentativa ($tentativa + 1); :if ($tentativa <= 3) do={ :delay 1s } } }; :if (!$enviado) do={ :log error "Falha total desconexao: $mac" } }; :set pos ($fim + 1) }; :if ($sucessos = $total and $total > 0) do={ :set pixMacsDesconectar; :log info "Todas desconexoes enviadas - variavel limpa ($sucessos/$total)" } else={ :log warning "Falhas detectadas - variavel mantida ($sucessos/$total)" }; :log info "Notificador desconectado finalizado"`;
+
+    // Script 3: PIX Verificador
+    const pixVerificador = `:local debug false; :local apiUrl "https://api.mikropix.online/api/recent-sales"; :local mikrotikId "${mikrotik_id}"; :local apiToken "${token}"; :if ($debug) do={ :log info "PIX iniciado" }; :local macs ""; :local vendasEncontradas false; :local tentativa 1; :while ($tentativa <= 5 and !$vendasEncontradas) do={ :if ($debug) do={ :log info "Tentativa $tentativa" }; :local jsonData "{\\"mikrotik_id\\":\\"$mikrotikId\\",\\"token\\":\\"$apiToken\\"}"; /tool fetch url=$apiUrl http-method=post http-header-field="Content-Type:application/json" http-data=$jsonData dst-path="vendas.txt"; :delay 2s; :local vendas [/file get [find name="vendas.txt"] contents]; /file remove [find name="vendas.txt"]; :if ([:len $vendas] > 0) do={ :if ($vendas = "N/A") do={ :if ($debug) do={ :log info "Nenhuma venda pendente (N/A) - parando tentativas" }; :set vendasEncontradas true; } else={ :local pos [:find $vendas "-"]; :if ($pos >= 0) do={ :local mac [:pick $vendas 0 $pos]; :local minutos [:tonum [:pick $vendas ($pos + 1) [:len $vendas]]]; :if ($debug) do={ :log info "MAC: $mac, Minutos: $minutos" }; :set vendasEncontradas true; :if ([:find $macs $mac] < 0) do={ :do { /ip hotspot ip-binding remove [find mac-address=$mac] } on-error={}; :local agora [/system clock get time]; :local hoje [/system clock get date]; :local h [:tonum [:pick $agora 0 2]]; :local m [:tonum [:pick $agora 3 5]]; :local novoMin (($h * 60) + $m + $minutos); :local diasAdicionais 0; :while ($novoMin >= 1440) do={ :set novoMin ($novoMin - 1440); :set diasAdicionais ($diasAdicionais + 1); }; :local novaH ($novoMin / 60); :local novaM ($novoMin % 60); :local hs [:tostr $novaH]; :local ms [:tostr $novaM]; :if ([:len $hs] = 1) do={ :set hs ("0" . $hs) }; :if ([:len $ms] = 1) do={ :set ms ("0" . $ms) }; :local novaData $hoje; :if ($diasAdicionais > 0) do={ :local pos1 [:find $hoje "-"]; :local ano [:tonum [:pick $hoje 0 $pos1]]; :local resto1 [:pick $hoje ($pos1 + 1) [:len $hoje]]; :local pos2 [:find $resto1 "-"]; :local mes [:tonum [:pick $resto1 0 $pos2]]; :local dia [:tonum [:pick $resto1 ($pos2 + 1) [:len $resto1]]]; :set dia ($dia + $diasAdicionais); :local diasNoMes 31; :if ($mes = 4 or $mes = 6 or $mes = 9 or $mes = 11) do={ :set diasNoMes 30 }; :if ($mes = 2) do={ :if (($ano % 4 = 0 and $ano % 100 != 0) or ($ano % 400 = 0)) do={ :set diasNoMes 29 } else={ :set diasNoMes 28 }; }; :while ($dia > $diasNoMes) do={ :set dia ($dia - $diasNoMes); :set mes ($mes + 1); :if ($mes > 12) do={ :set mes 1; :set ano ($ano + 1); }; :set diasNoMes 31; :if ($mes = 4 or $mes = 6 or $mes = 9 or $mes = 11) do={ :set diasNoMes 30 }; :if ($mes = 2) do={ :if (($ano % 4 = 0 and $ano % 100 != 0) or ($ano % 400 = 0)) do={ :set diasNoMes 29 } else={ :set diasNoMes 28 }; }; }; :local anoStr [:tostr $ano]; :local mesStr [:tostr $mes]; :local diaStr [:tostr $dia]; :if ([:len $mesStr] = 1) do={ :set mesStr ("0" . $mesStr) }; :if ([:len $diaStr] = 1) do={ :set diaStr ("0" . $diaStr) }; :set novaData ($anoStr . "-" . $mesStr . "-" . $diaStr); }; :local dataExpire ($novaData . "-" . $hs . $ms); :local comentario ("PIX-EXPIRE-" . $dataExpire . "-" . $mac); /ip hotspot ip-binding add mac-address=$mac type=bypassed comment=$comentario; :local horasCompradas ($minutos / 60); :local minutosRestantes ($minutos % 60); :local tempoFormatado ""; :if ($diasAdicionais > 0) do={ :set tempoFormatado ($diasAdicionais . "d "); }; :if ($horasCompradas > 0 or $diasAdicionais > 0) do={ :set tempoFormatado ($tempoFormatado . $horasCompradas . "h "); }; :set tempoFormatado ($tempoFormatado . $minutosRestantes . "m"); :log info "Binding criado: $mac - Expira em: $tempoFormatado ($novaData $hs:$ms)"; :set macs ($macs . $mac . ";"); } } } else={ :if ($debug) do={ :log info "Formato invalido recebido: $vendas" }; }; }; } else={ :if ($debug) do={ :log info "Resposta vazia - continuando..." }; }; :if (!$vendasEncontradas) do={ :set tentativa ($tentativa + 1); }; }; :if (!$vendasEncontradas) do={ :log warning "Nenhuma resposta valida apos 5 tentativas"; }; :if ([:len $macs] > 0) do={ :global pixMacsNotificar $macs; :global pixAcaoNotificar "connect"; :if ($debug) do={ :log info "Executando notificador..." }; /system script run pix-notifier-connect } else={ :if ($debug) do={ :log info "Nenhum MAC processado" }; }; :if ($debug) do={ :log info "PIX concluido" };`;
+
+    // Script 4: Heartbeat
+    const heartbeat = `:local url "https://api.mikropix.online/api/mikrotik/heartbeat"; :local id "${mikrotik_id}"; :local token "${token}"; :local version [/system resource get version]; :local uptime [/system resource get uptime]; :local json "{\\"mikrotik_id\\":\\"$id\\",\\"token\\":\\"$token\\",\\"version\\":\\"$version\\",\\"uptime\\":\\"$uptime\\"}"; :do { [/tool fetch url=$url http-method=post http-header-field="Content-Type:application/json" http-data=$json] } on-error={}`;
+
+    // Criar comandos de instalação
+    const installCommands = [
+      `/system script add name="pix-notifier-connect" source="${notificadorConexao}"`,
+      `/system script add name="pix-notifier-disconnect" source="${notificadorDesconexao}"`,
+      `/system script add name="pix-verificador" source="${pixVerificador}"`,
+      `/system script add name="pix-heartbeat" source="${heartbeat}"`
+    ];
+
+    // Comandos para configurar schedulers
+    const schedulerCommands = [
+      '/system scheduler remove [find name="pix-verificador-scheduler"]',
+      '/system scheduler remove [find name="pix-heartbeat-scheduler"]',
+      '/system scheduler add name="pix-verificador-scheduler" interval=30s on-event="/system script run pix-verificador"',
+      '/system scheduler add name="pix-heartbeat-scheduler" interval=5m on-event="/system script run pix-heartbeat"'
+    ];
+
+    // Gerar script completo para instalação
+    const fullScript = [
+      '# PIX Mikro - Instalação Automática de Scripts',
+      '# Executar linha por linha no terminal do WinBox',
+      '',
+      '# 1. Remoção de scripts existentes (se houver)',
+      ...removalCommands,
+      '',
+      '# 2. Criação dos novos scripts',
+      ...installCommands,
+      '',
+      '# 3. Configuração dos schedulers',
+      ...schedulerCommands,
+      '',
+      '# 4. Teste dos scripts (opcional)',
+      '/system script run pix-heartbeat',
+      '/system script run pix-verificador',
+      '',
+      '# Instalação concluída!'
+    ].join('\n');
+
+    console.log(`[INSTALL SCRIPTS] Scripts gerados com sucesso para MikroTik: ${req.mikrotik.nome}`);
+
+    res.json({
+      success: true,
+      message: 'Scripts gerados com sucesso',
+      mikrotik: {
+        id: mikrotik_id,
+        nome: req.mikrotik.nome
+      },
+      scripts: {
+        full_installation: fullScript,
+        removal_commands: removalCommands,
+        install_commands: installCommands,
+        scheduler_commands: schedulerCommands
+      },
+      instructions: [
+        '1. Copie os comandos abaixo',
+        '2. Abra o terminal do WinBox',
+        '3. Execute linha por linha ou cole tudo de uma vez',
+        '4. Aguarde a conclusão da instalação',
+        '5. Verifique os logs para confirmar funcionamento'
+      ]
+    });
+
+  } catch (err) {
+    console.error('[INSTALL SCRIPTS] Erro ao gerar scripts:', err);
     next(err);
   }
 });
