@@ -2183,7 +2183,7 @@ app.post('/api/mikrotik/auth-notification', validarTokenMikrotik, async (req, re
         break;
       default:
         console.warn('[MIKROTIK AUTH] Ação desconhecida:', action);
-        novoStatus = 'ativo'; // Status genérico para ações não reconhecidas
+        novoStatus = 'conectado'; // Status genérico para ações não reconhecidas
     }
 
     // Verificar plano atual e tempo restante
@@ -2234,7 +2234,7 @@ app.post('/api/mikrotik/auth-notification', validarTokenMikrotik, async (req, re
 
     // Lógica especial para quando não há plano ativo
     if (!planoAtual && (action.toLowerCase() === 'login' || action.toLowerCase() === 'connect' || action.toLowerCase() === 'authenticated')) {
-      novoStatus = 'ativo'; // Status para MAC sem plano tentando conectar
+      novoStatus = 'conectado'; // Status para MAC sem plano tentando conectar
       console.log('[MIKROTIK AUTH] MAC sem plano ativo tentando conectar:', mac_address);
     }
 
@@ -2303,7 +2303,7 @@ app.post('/api/mikrotik/auth-notification', validarTokenMikrotik, async (req, re
       success: true,
       message: planoExpirado 
         ? 'Plano expirado - conexão bloqueada' 
-        : !planoAtual && novoStatus === 'ativo' 
+        : !planoAtual && novoStatus === 'conectado' 
           ? 'MAC sem plano ativo detectado'
           : 'Autenticação registrada com sucesso',
       data: {
