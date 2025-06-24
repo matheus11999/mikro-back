@@ -1894,29 +1894,49 @@ app.post('/api/recent-sales', validarTokenMikrotik, async (req, res, next) => {
   try {
     const mikrotik_id = req.mikrotik_id; // Já validado pelo middleware
     
-    console.log(`[${formatDateWithTimezone()}] [RECENT-SALES] Buscando vendas das últimas 4 horas para mikrotik:`, req.mikrotik.nome);
+    console.log(`[${formatDateWithTimezone()}] [RECENT-SALES] Buscando vendas NÃO autenticadas das últimas 4 horas para mikrotik:`, req.mikrotik.nome);
 
     // Data das últimas 4 horas
     const agora = new Date();
     const quatroHorasAtras = new Date(agora.getTime() - 4 * 60 * 60 * 1000); // 4 horas atrás
 
-    // Buscar vendas aprovadas das últimas 4 horas para MACs que estão DESCONECTADOS
-    const vendas = await handleSupabaseOperation(() =>
-      supabaseAdmin
-        .from('vendas')
-        .select(`
-          *,
-          mac_id (mac_address, status),
-          plano_id (nome, duracao)
-        `)
-        .eq('mikrotik_id', mikrotik_id)
-        .eq('status', 'aprovado')
-        .gte('pagamento_aprovado_em', quatroHorasAtras.toISOString())
-        .order('pagamento_aprovado_em', { ascending: false })
-    );
+    // Buscar vendas aprovadas das últimas 4 horas que NÃO foram autenticadas ainda
+    let vendas;
+    try {
+      vendas = await handleSupabaseOperation(() =>
+        supabaseAdmin
+          .from('vendas')
+          .select(`
+            *,
+            mac_id (mac_address, status),
+            plano_id (nome, duracao)
+          `)
+          .eq('mikrotik_id', mikrotik_id)
+          .eq('status', 'aprovado')
+          .eq('autenticado', false) // Apenas vendas NÃO autenticadas
+          .gte('pagamento_aprovado_em', quatroHorasAtras.toISOString())
+          .order('pagamento_aprovado_em', { ascending: false })
+      );
+    } catch (err) {
+      // Se a coluna 'autenticado' não existir ainda, buscar sem esse filtro
+      console.log('[RECENT-SALES] Coluna autenticado não existe ainda, buscando sem filtro...');
+      vendas = await handleSupabaseOperation(() =>
+        supabaseAdmin
+          .from('vendas')
+          .select(`
+            *,
+            mac_id (mac_address, status),
+            plano_id (nome, duracao)
+          `)
+          .eq('mikrotik_id', mikrotik_id)
+          .eq('status', 'aprovado')
+          .gte('pagamento_aprovado_em', quatroHorasAtras.toISOString())
+          .order('pagamento_aprovado_em', { ascending: false })
+      );
+    }
 
     if (!vendas || vendas.length === 0) {
-      console.log('[RECENT-SALES] Nenhuma venda encontrada nas últimas 4 horas');
+      console.log('[RECENT-SALES] Nenhuma venda NÃO autenticada encontrada nas últimas 4 horas');
       return res.send('N/A');
     }
 
@@ -1926,7 +1946,7 @@ app.post('/api/recent-sales', validarTokenMikrotik, async (req, res, next) => {
       const isDesconectado = !statusMac || statusMac === 'coletado' || statusMac === 'desconectado' || statusMac === 'precisa_comprar';
       
       if (isDesconectado) {
-        console.log(`[RECENT-SALES] MAC ${venda.mac_id?.mac_address} está desconectado (status: ${statusMac}) - incluindo na lista`);
+        console.log(`[RECENT-SALES] MAC ${venda.mac_id?.mac_address} está desconectado e NÃO autenticado (status: ${statusMac}) - incluindo na lista`);
       } else {
         console.log(`[RECENT-SALES] MAC ${venda.mac_id?.mac_address} está conectado (status: ${statusMac}) - ignorando`);
       }
@@ -1947,7 +1967,7 @@ app.post('/api/recent-sales', validarTokenMikrotik, async (req, res, next) => {
       return `${mac}-${minutos}`;
     });
 
-    console.log(`[RECENT-SALES] Encontradas ${vendas.length} vendas totais, ${vendasDesconectadas.length} de MACs desconectados`);
+    console.log(`[RECENT-SALES] Encontradas ${vendas.length} vendas NÃO autenticadas, ${vendasDesconectadas.length} de MACs desconectados`);
 
     // Retornar apenas texto puro, uma venda por linha
     res.set('Content-Type', 'text/plain');
@@ -2238,6 +2258,29 @@ app.post('/api/mikrotik/auth-notification', validarTokenMikrotik, async (req, re
         `)
         .single()
     );
+
+    // Se o MAC foi conectado com sucesso e tem plano ativo, marcar venda como autenticada
+    if (novoStatus === 'conectado' && planoAtual && !planoExpirado) {
+      // Buscar a venda mais recente aprovada para este MAC
+      const vendaParaAutenticar = macObj.vendas
+        ?.filter(v => v.status === 'aprovado' && v.pagamento_aprovado_em)
+        .sort((a, b) => new Date(b.pagamento_aprovado_em) - new Date(a.pagamento_aprovado_em))[0];
+
+      if (vendaParaAutenticar) {
+        try {
+          await handleSupabaseOperation(() =>
+            supabaseAdmin
+              .from('vendas')
+              .update({ autenticado: true })
+              .eq('id', vendaParaAutenticar.id)
+          );
+          
+          console.log(`[MIKROTIK AUTH] Venda ${vendaParaAutenticar.id} marcada como autenticada para MAC ${mac_address}`);
+        } catch (err) {
+          console.log('[MIKROTIK AUTH] Coluna autenticado ainda não existe, continuando sem marcar...');
+        }
+      }
+    }
 
     return res.json({
       success: true,
