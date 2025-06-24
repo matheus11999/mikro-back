@@ -1316,6 +1316,13 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
                 if (mikrotikInfo && mikrotikInfo.cliente_id) {
                   await supabaseAdmin.rpc('incrementar_saldo_cliente', { cliente_id: mikrotikInfo.cliente_id, valor: comissaoDono });
                 }
+                // Buscar informações do plano para preservar histórico
+                const { data: planoInfo } = await supabaseAdmin
+                  .from('planos')
+                  .select('nome, duracao, preco')
+                  .eq('id', venda.plano_id)
+                  .single();
+
                 // Atualiza venda - valor mantém o preço total do plano
                 await handleSupabaseOperation(() =>
                   supabaseAdmin
@@ -1325,7 +1332,10 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
                       pagamento_aprovado_em: pagamentoAprovadoEm,
                       senha_id: senha.id,
                       valor: venda.preco, // valor = preço total do plano
-                      valor_creditado_cliente: comissaoDono // preserva histórico do valor creditado
+                      valor_creditado_cliente: comissaoDono, // preserva histórico do valor creditado
+                      plano_nome: planoInfo?.nome, // preserva nome do plano
+                      plano_duracao: planoInfo?.duracao, // preserva duração do plano
+                      plano_preco: planoInfo?.preco // preserva preço do plano
                     })
                     .eq('id', venda.id)
                 );
@@ -1565,6 +1575,13 @@ app.post('/api/webhook/mercadopago', async (req, res, next) => {
               console.log(`[WEBHOOK MP] Saldos creditados - Admin: R$ ${comissaoAdmin.toFixed(2)}, Cliente: R$ ${comissaoCliente.toFixed(2)}`);
             }
             
+            // Buscar informações do plano para preservar histórico
+            const { data: planoInfo } = await supabaseAdmin
+              .from('planos')
+              .select('nome, duracao, preco')
+              .eq('id', venda.plano_id.id)
+              .single();
+
             // Sistema SEM SENHAS - atualiza diretamente o status
             atualizacaoVenda = {
               ...atualizacaoVenda,
@@ -1572,6 +1589,9 @@ app.post('/api/webhook/mercadopago', async (req, res, next) => {
               pagamento_aprovado_em: agora,
               valor: valorTotal, // valor = preço total do plano
               valor_creditado_cliente: comissaoCliente, // preserva histórico do valor creditado
+              plano_nome: planoInfo?.nome, // preserva nome do plano
+              plano_duracao: planoInfo?.duracao, // preserva duração do plano
+              plano_preco: planoInfo?.preco, // preserva preço do plano
               senha_id: null // Sistema sem senhas
             };
             
