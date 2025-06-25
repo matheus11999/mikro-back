@@ -84,8 +84,10 @@ async function processarAprovacaoPagamento(venda, mpData) {
 
     const porcentagemAdmin = Math.max(0, Math.min(100, parseFloat(mikrotikInfo?.profitpercentage) || 10));
     const valorTotal = venda.valor || venda.preco; // Mantém compatibilidade com a coluna 'preco' se 'valor' não existir.
-    const valorCreditadoCliente = truncar3Decimais(valorTotal * ((100 - porcentagemAdmin) / 100)); // Cliente recebe o que sobra após a comissão do admin
-    const comissaoAdmin = truncar3Decimais(valorTotal - valorCreditadoCliente); // Admin recebe a diferença
+    
+    // Calcular comissão primeiro para maior precisão
+    const comissaoAdmin = truncar3Decimais(valorTotal * (porcentagemAdmin / 100));
+    const valorCreditadoCliente = truncar3Decimais(valorTotal - comissaoAdmin); // Cliente recebe o que sobra após a comissão do admin
 
     // 1. Incrementar saldos
     await supabaseAdmin.rpc('incrementar_saldo_admin', { valor: comissaoAdmin });
@@ -679,9 +681,7 @@ app.post('/api/captive-check/status', async (req, res, next) => {
                   .single()
               );
               
-              let porcentagemAdmin = truncar3Decimais(mikrotikInfo?.profitpercentage) || 10;
-              if (porcentagemAdmin > 100) porcentagemAdmin = 100;
-              if (porcentagemAdmin < 0) porcentagemAdmin = 0;
+              const porcentagemAdmin = Math.max(0, Math.min(100, parseFloat(mikrotikInfo?.profitpercentage) || 10));
               
               const comissaoAdmin = truncar3Decimais(vendaPendente.preco * (porcentagemAdmin / 100));
               const comissaoDono = truncar3Decimais(vendaPendente.preco - comissaoAdmin);
@@ -1177,9 +1177,7 @@ app.post('/api/captive-check/verify', async (req, res, next) => {
                     .eq('id', mikrotik_id)
                     .single()
                 );
-                let porcentagemAdmin = truncar3Decimais(mikrotikInfo?.profitpercentage) || 10;
-                if (porcentagemAdmin > 100) porcentagemAdmin = 100;
-                if (porcentagemAdmin < 0) porcentagemAdmin = 0;
+                const porcentagemAdmin = Math.max(0, Math.min(100, parseFloat(mikrotikInfo?.profitpercentage) || 10));
                 const comissaoAdmin = truncar3Decimais(venda.preco * (porcentagemAdmin / 100));
                 const comissaoDono = truncar3Decimais(venda.preco - comissaoAdmin);
                 // Atualiza saldo do admin
