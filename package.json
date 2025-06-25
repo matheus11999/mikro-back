@@ -2,11 +2,13 @@
   "name": "pix-mikro-backend",
   "version": "1.1.0",
   "description": "Backend API for the PIX MikroTik system",
-  "main": "api.cjs",
+  "main": "src/index.js",
   "scripts": {
-    "start": "node api.cjs",
-    "dev": "nodemon api.cjs",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node src/index.js",
+    "start:old": "node api.cjs",
+    "dev": "nodemon src/index.js",
+    "dev:old": "nodemon api.cjs",
+    "test": "node test-calculations.js"
   },
   "keywords": [
     "mikrotik",
