@@ -75,8 +75,69 @@ app.use('/api/mikrotik', require('./routes/mikrotik'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/templates', require('./routes/templates'));
 
-// Rota de recent-sales (compatibilidade)
-app.use('/api', require('./routes/mikrotik'));
+// Rota específica para recent-sales (compatibilidade com scripts MikroTik)
+app.post('/api/recent-sales', require('./middlewares/auth').validarTokenMikrotik, async (req, res, next) => {
+  try {
+    const { mikrotik_id } = req.body;
+    
+    console.log(`[${formatDateWithTimezone()}] [RECENT-SALES] Buscando vendas para: ${req.mikrotik.nome}`);
+
+    // Buscar venda mais recente aprovada mas não processada
+    const venda = await require('./services/database').handleSupabaseOperation(() =>
+      require('./services/database').supabaseAdmin
+        .from('vendas')
+        .select('*, mac_id(*), plano_id(*)')
+        .eq('mikrotik_id', mikrotik_id)
+        .eq('status', 'aprovado')
+        .eq('autenticado', false)
+        .order('pagamento_aprovado_em', { ascending: false })
+        .limit(1)
+        .single()
+    );
+
+    if (!venda) {
+      console.log(`[${formatDateWithTimezone()}] [RECENT-SALES] Nenhuma venda pendente encontrada`);
+      // Retorna "N/A" conforme esperado pelo script MikroTik
+      res.setHeader('Content-Type', 'text/plain');
+      return res.send('N/A');
+    }
+
+    // Calcular tempo restante baseado na duração do plano
+    const tempoRestante = venda.plano_duracao || venda.plano_id?.duracao || 60;
+    const macAddress = venda.mac_id?.mac_address;
+
+    if (!macAddress) {
+      console.log(`[${formatDateWithTimezone()}] [RECENT-SALES] MAC address não encontrado para venda ${venda.id}`);
+      res.setHeader('Content-Type', 'text/plain');
+      return res.send('N/A');
+    }
+
+    // Atualizar MAC com tempo restante
+    await require('./services/database').handleSupabaseOperation(() =>
+      require('./services/database').supabaseAdmin
+        .from('macs')
+        .update({
+          tempo_restante: tempoRestante,
+          ultima_atualizacao: require('./utils/datetime').getCurrentISOTimestamp()
+        })
+        .eq('id', venda.mac_id.id)
+    );
+
+    // Formato esperado pelo script: "MAC-MINUTOS"
+    const resposta = `${macAddress}-${tempoRestante}`;
+    
+    console.log(`[${formatDateWithTimezone()}] [RECENT-SALES] Retornando: ${resposta}`);
+    
+    res.setHeader('Content-Type', 'text/plain');
+    res.send(resposta);
+
+  } catch (error) {
+    console.error(`[${formatDateWithTimezone()}] [RECENT-SALES] Erro:`, error.message);
+    // Em caso de erro, retornar N/A para não quebrar o script
+    res.setHeader('Content-Type', 'text/plain');
+    res.send('N/A');
+  }
+});
 
 // ================================================================
 // MIDDLEWARE DE ERRO

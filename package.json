@@ -8,7 +8,9 @@
     "start:old": "node api.cjs",
     "dev": "nodemon src/index.js",
     "dev:old": "nodemon api.cjs",
-    "test": "node test-calculations.js"
+    "test": "node test-calculations.js",
+    "setup": "node scripts/setup-dev.js",
+    "setup:dev": "node scripts/setup-dev.js"
   },
   "keywords": [
     "mikrotik",

@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 
 const { supabaseAdmin, handleSupabaseOperation } = require('../services/database');
 const { formatDateWithTimezone } = require('../utils/datetime');
+const { getProcessorStats, clearCache } = require('../services/salesProcessor');
 
 const router = express.Router();
 
@@ -195,6 +196,80 @@ router.get('/mikrotiks', async (req, res, next) => {
 
   } catch (error) {
     console.error(`[${formatDateWithTimezone()}] [ADMIN] Erro ao listar MikroTiks:`, error.message);
+    next(error);
+  }
+});
+
+/**
+ * GET /api/admin/sales-processor/stats
+ * Retorna estatísticas do processador de vendas
+ */
+router.get('/sales-processor/stats', async (req, res, next) => {
+  try {
+    console.log(`[${formatDateWithTimezone()}] [ADMIN] Consultando estatísticas do processador de vendas`);
+
+    const stats = getProcessorStats();
+    
+    // Buscar algumas estatísticas adicionais do banco
+    const vendasPendentes = await handleSupabaseOperation(() =>
+      supabaseAdmin
+        .from('vendas')
+        .select('id')
+        .eq('status', 'pending')
+    );
+
+    const vendasErro = await handleSupabaseOperation(() =>
+      supabaseAdmin
+        .from('vendas')
+        .select('id')
+        .eq('status', 'erro_processamento')
+    );
+
+    res.json({
+      success: true,
+      data: {
+        processador: {
+          processamentos_ativos: stats.processamentosAtivos,
+          cache_size: stats.cacheSize,
+          uptime_seconds: Math.floor(stats.uptime)
+        },
+        vendas: {
+          pendentes: vendasPendentes?.length || 0,
+          com_erro: vendasErro?.length || 0
+        },
+        sistema: {
+          memoria_usada_mb: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+          memoria_total_mb: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
+          uptime_processo: Math.floor(process.uptime())
+        },
+        timestamp: formatDateWithTimezone()
+      }
+    });
+
+  } catch (error) {
+    console.error(`[${formatDateWithTimezone()}] [ADMIN] Erro ao consultar stats do processador:`, error.message);
+    next(error);
+  }
+});
+
+/**
+ * POST /api/admin/sales-processor/clear-cache
+ * Limpa o cache do processador de vendas
+ */
+router.post('/sales-processor/clear-cache', async (req, res, next) => {
+  try {
+    console.log(`[${formatDateWithTimezone()}] [ADMIN] Limpando cache do processador de vendas`);
+
+    clearCache();
+
+    res.json({
+      success: true,
+      message: 'Cache do processador de vendas limpo com sucesso',
+      timestamp: formatDateWithTimezone()
+    });
+
+  } catch (error) {
+    console.error(`[${formatDateWithTimezone()}] [ADMIN] Erro ao limpar cache:`, error.message);
     next(error);
   }
 });

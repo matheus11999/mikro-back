@@ -2,12 +2,11 @@ const express = require('express');
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
 const { supabaseAdmin, handleSupabaseOperation } = require('../services/database');
+// Usando o novo processador otimizado
 const { 
   processarAprovacaoPagamento, 
-  isPaymentBeingProcessed, 
-  lockPaymentProcessing, 
-  unlockPaymentProcessing 
-} = require('../services/payment');
+  isPaymentBeingProcessed 
+} = require('../services/salesProcessor');
 const { formatDateWithTimezone, getCurrentISOTimestamp } = require('../utils/datetime');
 const { mercadoPago, apiDomain } = require('../config/env');
 
@@ -55,9 +54,6 @@ router.post('/mercadopago', async (req, res, next) => {
       console.log(`[${formatDateWithTimezone()}] [WEBHOOK] Payment ${paymentId} já está sendo processado. Ignorando.`);
       return res.status(200).json({ success: false, message: 'Pagamento já sendo processado' });
     }
-
-    // Bloquear processamento deste pagamento
-    lockPaymentProcessing(paymentId);
 
     try {
       // Buscar dados do pagamento no Mercado Pago
@@ -122,18 +118,8 @@ router.post('/mercadopago', async (req, res, next) => {
         status: mpData.status
       });
 
-    } finally {
-      // Sempre liberar o lock do pagamento
-      unlockPaymentProcessing(paymentId);
-    }
-
   } catch (error) {
     console.error(`[${formatDateWithTimezone()}] [WEBHOOK] Erro no processamento:`, error.message);
-    
-    // Liberar lock em caso de erro
-    if (paymentId) {
-      unlockPaymentProcessing(paymentId);
-    }
     
     // Sempre retornar 200 para o MP não reenviar
     res.status(200).json({ 
