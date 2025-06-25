@@ -35,12 +35,14 @@ async function processarAprovacaoPagamento(venda, mpData) {
       .single()
   );
 
-  // Calcular comissões usando função centralizada
+  // Calcular comissões usando função centralizada e corrigida
   const valorTotal = venda.valor || venda.preco;
-  const { comissaoAdmin, valorCliente } = calcularComissao(
+  const { comissaoAdmin, valorCliente, porcentagemUsada } = calcularComissao(
     valorTotal, 
     mikrotikInfo?.profitpercentage
   );
+  
+  console.log(`[PROCESSAMENTO] Cálculo de comissão: Valor total R$ ${valorTotal.toFixed(3)}, Porcentagem: ${porcentagemUsada}%, Admin: R$ ${comissaoAdmin.toFixed(3)}, Cliente: R$ ${valorCliente.toFixed(3)}`);
 
   // 1. Incrementar saldos
   await incrementarSaldoAdmin(comissaoAdmin);

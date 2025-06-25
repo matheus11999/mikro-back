@@ -6,12 +6,7 @@
  */
 
 const { startServer } = require('./app');
-
-// Função para verificar MACs expirados (placeholder)
-async function verificarMacsExpirados() {
-  // TODO: Implementar verificação de MACs expirados
-  console.log('[STARTUP] Verificação de MACs expirados executada');
-}
+const { executarLimpezaCompleta, agendarLimpezaAutomatica } = require('./services/cleanup');
 
 // Inicializar servidor
 async function main() {
@@ -19,8 +14,15 @@ async function main() {
     // Iniciar servidor
     startServer();
     
-    // Executar verificações iniciais em background
-    setTimeout(verificarMacsExpirados, 1000);
+    // Executar limpeza inicial e agendar automática
+    setTimeout(async () => {
+      try {
+        await executarLimpezaCompleta();
+        agendarLimpezaAutomatica();
+      } catch (error) {
+        console.error('Erro na limpeza inicial:', error.message);
+      }
+    }, 2000);
     
   } catch (error) {
     console.error('Erro ao inicializar servidor:', error);

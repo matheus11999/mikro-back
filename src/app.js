@@ -66,15 +66,17 @@ app.get('/health', (req, res) => {
 });
 
 // ================================================================
-// IMPORTAR ROTAS MODULARES (A SEREM CRIADAS)
+// IMPORTAR ROTAS MODULARES
 // ================================================================
 
-// TODO: Implementar rotas modulares
-// app.use('/api/captive-check', require('./routes/captive'));
-// app.use('/api/webhook', require('./routes/webhook'));
-// app.use('/api/mikrotik', require('./routes/mikrotik'));
-// app.use('/api/admin', require('./routes/admin'));
-// app.use('/api/templates', require('./routes/templates'));
+app.use('/api/captive-check', require('./routes/captive'));
+app.use('/api/webhook', require('./routes/webhook'));
+app.use('/api/mikrotik', require('./routes/mikrotik'));
+app.use('/api/admin', require('./routes/admin'));
+app.use('/api/templates', require('./routes/templates'));
+
+// Rota de recent-sales (compatibilidade)
+app.use('/api', require('./routes/mikrotik'));
 
 // ================================================================
 // MIDDLEWARE DE ERRO
